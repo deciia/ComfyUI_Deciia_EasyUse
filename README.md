@@ -1,4 +1,4 @@
-# ComfyUI_Deciia_All
+# ComfyUI_Deciia_EasyUse
 
 作者 deciia 的 ComfyUI 自定义节点合集。当前聚焦 **MiniMax-H3 视频生成**：
 二采分块执行器、跨插件桥接节点、LoRA 串管理，以及配套前端面板。

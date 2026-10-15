@@ -1,0 +1,17 @@
+{
+  "autostart": true,
+  "public_url": "",
+  "services": [
+    {
+      "name": "ExampleService",
+      "prefix": "/example",
+      "upstream": "http://127.0.0.1:9999",
+      "root_path": "/example",
+      "map": "passthrough",
+      "cwd": "C:/path/to/service",
+      "command": ["{python}", "run.py", "--port", "9999"],
+      "port": 9999,
+      "timeout": 30
+    }
+  ]
+}

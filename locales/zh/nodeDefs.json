@@ -1,0 +1,220 @@
+{
+ "ModelAttentionBackend": {
+  "display_name": "Model Attention Backend",
+  "inputs": {
+   "model": {
+    "tooltip": "要打补丁的模型。"
+   },
+   "attention": {
+    "tooltip": "稠密注意力后端。Comfy Kitchen attention 使用 INT8 量化注意力，仅支持 Nvidia 与 AMD GPU。"
+   }
+  }
+ },
+ "GetVideoComponents": {
+  "display_name": "Get Video Components",
+  "inputs": {
+   "video": {
+    "tooltip": "要提取分量（视频/音频轨）的源视频。"
+   }
+  }
+ },
+ "SaveVideo": {
+  "display_name": "Save Video",
+  "inputs": {
+   "video": {
+    "tooltip": "要保存的视频。"
+   },
+   "filename_prefix": {
+    "tooltip": "保存文件名前缀。可含格式化占位，如 %date:yyyy-MM-dd% 或 %Empty Latent Image.width%，用于插入其它节点的数值。"
+   },
+   "format": {
+    "tooltip": "输出容器。Auto 时 Auto/H.264 用 MP4、AV1 用 WebM；MP4、MKV、WebM 为强制指定容器。"
+   },
+   "codec": {
+    "tooltip": "输出视频编码。Auto 保留兼容的源流；H.264 与 AV1 重编码支持 SDR、HDR(HLG) 与 HDR PQ。"
+   }
+  }
+ },
+ "MiniMaxChunkFeedForward": {
+  "display_name": "MiniMax H3 Chunk FeedForward",
+  "inputs": {
+   "chunks": {
+    "tooltip": "把前馈 token 切成的块数。块越多峰值显存越低，开销略增。"
+   },
+   "seq_threshold": {
+    "tooltip": "仅当打包 token 数超过该值才分块（短序列跳过）。"
+   }
+  }
+ },
+ "MiniMaxLowVRAMAttention": {
+  "display_name": "MiniMax H3 Low VRAM Attention",
+  "inputs": {
+   "head_chunks": {
+    "tooltip": "把注意力调用切分的头组数。算子内部临时显存随之下降；各头相互独立，结果不变。"
+   }
+  }
+ },
+ "PathchSageAttentionKJ": {
+  "display_name": "Patch Sage Attention KJ",
+  "inputs": {
+   "sage_attention": {
+    "tooltip": "把经过此节点的模型的注意力替换为 sageattn。选 disabled 再跑一次即可还原。需已安装 sageattention 库。"
+   },
+   "allow_compile": {
+    "tooltip": "允许对 sage attention 使用 torch.compile，需要 sageattn 2.2.0 及以上。"
+   }
+  }
+ },
+ "MiniMaxH3HybridLoader": {
+  "display_name": "MiniMax H3 Hybrid Loader",
+  "inputs": {
+   "base_model": {
+    "tooltip": "主底模——所有张量从这里开始。"
+   },
+   "overlay_model": {
+    "tooltip": "副底模——overlay_preset 匹配到的张量改从这里加载。可与 base_model 相同（等效只加载底模）。"
+   },
+   "overlay_preset": {
+    "tooltip": "从副底模取哪些张量组。'none'=纯底模（等效原生 UNETLoader）；'ref2va_adaln_over_fl2va'（默认）=只取逐块 adaln_proj；'ref2va_all_adaln_over_fl2va'=再取 final_layer.adaln_proj；'ref2va_full_over_fl2va'/'fl2va_full_over_ref2va'=全部取自副模（校验用）；'block_range_adaln'=只对 [start, end]（含端点）块号内的块取 adaln_proj；'custom'=只用 custom_overlays。"
+   },
+   "block_range_start": {
+    "tooltip": "仅 overlay_preset='block_range_adaln' 时生效。adaln_proj 取自副模的块号下界（含）。H3 DiT 共 50 块，索引 0..49。"
+   },
+   "block_range_end": {
+    "tooltip": "仅 overlay_preset='block_range_adaln' 时生效。块号上界（含）。若 end < start，则不从副模取任何块（等效纯底模）。"
+   },
+   "final_adaln_from_overlay": {
+    "tooltip": "是否额外从副模覆盖 final_layer.adaln_proj.linear.{weight,bias}，在任意 preset 之上叠加。False（默认）=final_layer.adaln 留在底模（除非 preset 已覆盖，如 ref2va_all_adaln_over_fl2va）；True=在 preset 之外再把 final_layer.adaln 取自副模。"
+   },
+   "custom_overlays": {
+    "tooltip": "逗号分隔的键/前缀/glob：在 preset 之外额外从副模取。如 'blocks.49.,final_layer.video_out.'。以 '.' 结尾的裸前缀按前缀匹配；其余按 fnmatch 通配（如 'blocks.[0-4].*.attn.qkv_proj.weight'）。"
+   },
+   "custom_base": {
+    "tooltip": "逗号分隔的键/前缀/glob：即使 preset 或 custom_overlays 会从副模取，也强制回到底模。想让 final_layer.adaln_proj 留在底模而其余 adaln 取自副模时有用。"
+   },
+   "weight_dtype": {
+    "tooltip": "与原生「加载扩散模型」节点同义。不确定就保持 'default'。"
+   }
+  }
+ },
+ "SolAttnMiniMax": {
+  "display_name": "Patch Sol-Attn (MiniMax)",
+  "inputs": {
+   "tau": {
+    "tooltip": "阈值 β。越大越稀疏：1.0≈16% 块保留精确，1.5≈7%，2.0≈2.7%。"
+   },
+   "start_percent": {
+    "tooltip": "在此之前保持稠密注意力。论文用 0.2。"
+   },
+   "min_tokens": {
+    "tooltip": "短于该 token 数的序列保持稠密。"
+   },
+   "sink_conditioning": {
+    "tooltip": "exact_kv：每条 query 都精确看到打包的文本/音频/参考行（约 3% 开销）；exact_kv_and_rows：再把目标音频的 query 行也跑稠密（保证生成音频不受损），参考行保持稀疏，开销不再随参考数量增长。"
+   },
+   "morton": {
+    "tooltip": "把视频 token 重排为 Morton（Z 序），使每个 64-token 块是紧凑的 3D 邻域。对稠密注意力完全中性。"
+   },
+   "morton_curve": {
+    "tooltip": "2d_frame：帧内 Z 序、帧顺序保持不变——适配 H3 的非均匀时间轴。"
+   },
+   "centroid_tail": {
+    "tooltip": "每 64-token query 块在其质心处求一次池化分支而非逐行计算。约快 1.4 倍；做质量 A/B 对比时请关闭。"
+   },
+   "routed_cap_percent": {
+    "tooltip": "路由块列表上限（占序列百分比）；0=不设限。这是唯一随 T² 增长的工作区项。tau=1.4 时 ~30 即 3 倍余量且实测无损；低于实际密度时路由块退化为池化项。"
+   },
+   "reuse_qkv_memory": {
+    "tooltip": "把注意力输出写入模型融合的 qkv 缓冲而非新分配，峰值显存少一个输出尺寸的张量（80k token 时约 1.2GB）。对 MiniMax-H3 安全（该缓冲在 attention 后即被丢弃）；其他模型除非确认同样行为，请保持关闭。"
+   },
+   "dense_blocks": {
+    "tooltip": "保持稠密的 Transformer 块，如 '0-2,-1'。首尾块对近似最敏感。"
+   },
+   "tau_profile": {
+    "tooltip": "逐块 tau，覆盖基础值。多条 '块号=tau' 用 ';' 或换行分隔。"
+   }
+  }
+ },
+ "MajoorOmniCamDirector": {
+  "display_name": "OmniCam Director",
+  "inputs": {
+   "image": {
+    "tooltip": "参考静帧，或为其采样的一段片段。"
+   },
+   "video": {
+    "tooltip": "代理片段，或按节点帧率读取的 IMAGE 批。"
+   },
+   "solved_scene": {
+    "tooltip": "来自 OmniCam Extractor 的已解算场景。只导入其样片相机：上游场景的运动层、物体与剪辑不会合并。Director 对每个新解算指纹只导入一次，之后不再改动你的编辑；断开连线可冻结已导入内容。"
+   }
+  }
+ },
+ "MajoorOmniCamExtractor": {
+  "display_name": "OmniCam Extractor",
+  "inputs": {
+   "video": {
+    "tooltip": "单个连续镜头，VIDEO 或 IMAGE 批。硬切只报告、不拼接。"
+   },
+   "extract_mode": {
+    "tooltip": "模式：camera_track 从视频解算 6DoF 相机运动；scene_reconstruct 从单张静图恢复 3D 代理场景。"
+   },
+   "method": {
+    "tooltip": "auto 依次选用实际已安装的求解器：DPVO → pycolmap → OpenCV/SIFT，报告中注明实际使用的一个。按名指定可强制选用，未安装会给出安装提示。"
+   },
+   "motion_scale": {
+    "tooltip": "单目平移没有度量尺度；用此值为你的场景设定尺度。"
+   },
+   "horizon_stabilization": {
+    "tooltip": "衰减全局对齐后残余的逐帧相机横滚；0 保留解算原样，1 完全抹平标准横滚。"
+   },
+   "recon_mode": {
+    "tooltip": "Depth Mesh（MoGe 表面网格）/ Blockout（闭合几何体）/ Hybrid（混合）/ Scan（VGGT 多视图）。"
+   },
+   "recon_semantic_labels": {
+    "tooltip": "逗号/换行分隔的语义标签。留空=默认室内分类法。"
+   },
+   "recon_blockout_assets": {
+    "tooltip": "Blockout 资产库：把拟合的盒子换成真实 GLB 道具。'proxy' 在盒子旁放置模型，'replace' 隐藏盒子。需先运行 scripts/fetch_blockout_library.py。"
+   }
+  }
+ },
+ "MajoorOmniCamMonitor": {
+  "display_name": "OmniCam Monitor",
+  "inputs": {
+   "duration_seconds": {
+    "tooltip": "要编译的镜头时长（秒）。0 继承所连 MotionScene（Director 编排的镜头）的时长。"
+   },
+   "target_fps": {
+    "tooltip": "轨迹采样帧率。0 继承所连 MotionScene 的编排帧率。"
+   },
+   "guide_reference_index": {
+    "tooltip": "OmniCam 指南占据目标模型的第几个 <Video N> / Video N 槽位。MiniMax H3 支持 1-3，Seedance 2.5 支持 1-10。超范围值在预检时报错，不会静默截断。"
+   },
+   "guide_style": {
+    "tooltip": "编译出的提示词假定所连指南采用哪种「拍摄配方」语义。'auto' 按 Director 实际记录解析（见样片的 guide_style）；在此强制指定则覆盖之。"
+   },
+   "playblast_video": {
+    "tooltip": "该场景描述的样片，VIDEO 或 IMAGE 批。"
+   },
+   "reference_plan_json": {
+    "tooltip": "高级：JSON 数组，声明 OmniCam 不持有媒体的外部参考（如形象图、动作视频），用 Reference Role Matrix 编辑器编写。每项声明 id、media_type、slot_hint、roles、ignore。留空=不声明额外参考。"
+   }
+  }
+ },
+ "easy MiniMaxH3SamplerSelect": {
+  "display_name": "MiniMax H3 采样器选择器（含 DMAD）",
+  "inputs": {
+   "sampler_name": {
+    "tooltip": "dmad = DMAD 4 步重噪声规则；其余为 ComfyUI 原生采样器。"
+   }
+  }
+ },
+ "easy multiTrackTaskOutput": {
+  "display_name": "MultiTrack Task Output",
+  "inputs": {
+   "previous": {
+    "tooltip": "可选的项目循环执行依赖。"
+   }
+  }
+ }
+}

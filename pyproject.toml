@@ -1,14 +1,14 @@
 [project]
-name = "comfyui-deciia-all"
-description = "Deciia custom nodes: MiniMax-H3 chunked second-pass samplers, cross-plugin bridge nodes, LoRA stacks"
-version = "1.0.0"
+name = "comfyui-deciia-easyuse"
+description = "Deiia Easy Use: MiniMax-H3 samplers, sparse attention presets, lazy model routing, model hub, service bridge, LoRA stacks, workstation"
+version = "2.0.0"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
 
 [project.urls]
-Repository = "https://github.com/deciia/ComfyUI_Deciia_All"
+Repository = "https://github.com/deciia/ComfyUI_Deciia_EasyUse"
 
 [tool.comfy]
 PublisherId = "deciia"
-DisplayName = "Deciia All"
+DisplayName = "Deiia Easy Use"
 Icon = ""
