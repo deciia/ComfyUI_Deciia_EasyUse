@@ -82,40 +82,52 @@ function buildPanel(node) {
   };
   bar.appendChild(mkBtn("＋组", () => {
     const t = readTable(node);
-    const name = (prompt("新组名（与合并台模型选择同名匹配，如 qwen2.1 / krea2 / h3）", `组${t.presets.length + 1}`) || "").trim();
-    if (!name) return;
-    if (t.presets.some((p) => p.name === name)) return alert(`组「${name}」已存在`);
-    const files = {};
-    SLOTS.forEach((k) => { files[k] = k === "机动" ? { cat: "不用", file: "" } : { file: "" }; });
-    t.presets.push({ name, files });
-    node._hubGroup = name;
-    writeTable(node, t);
+    _deiiaAsk("hub-new", "新组名（与合并台模型选择同名匹配，如 qwen2.1 / krea2 / h3）", `组${t.presets.length + 1}`, (name) => {
+      if (t.presets.some((p) => p.name === name)) {
+        _deiiaMsg("hub-new-dup", `组「${name}」已存在`);
+        return;
+      }
+      const files = {};
+      SLOTS.forEach((k) => { files[k] = k === "机动" ? { cat: "不用", file: "" } : { file: "" }; });
+      t.presets.push({ name, files });
+      node._hubGroup = name;
+      writeTable(node, t);
+    });
   }));
   bar.appendChild(mkBtn("改名", () => {
     const t = readTable(node); const g = currentGroup(t, node);
     if (!g) return;
-    const name = (prompt("把当前组改名为", g.name) || "").trim();
-    if (!name || name === g.name) return;
-    if (t.presets.some((p) => p.name === name)) return alert(`组「${name}」已存在`);
-    g.name = name;
-    node._hubGroup = name;
-    writeTable(node, t);
+    _deiiaAsk("hub-rename", "把当前组改名为", g.name, (name) => {
+      if (!name || name === g.name) return;
+      if (t.presets.some((p) => p.name === name)) {
+        _deiiaMsg("hub-rename-dup", `组「${name}」已存在`);
+        return;
+      }
+      g.name = name;
+      node._hubGroup = name;
+      writeTable(node, t);
+    });
   }));
   bar.appendChild(mkBtn("复制组", () => {
     const t = readTable(node); const g = currentGroup(t, node);
     if (!g) return;
-    const name = (prompt("复制当前组为新组名", g.name + "-copy") || "").trim();
-    if (!name) return;
-    if (t.presets.some((p) => p.name === name)) return alert(`组「${name}」已存在`);
-    t.presets.push({ name, files: JSON.parse(JSON.stringify(g.files || {})) });
-    node._hubGroup = name;
-    writeTable(node, t);
+    _deiiaAsk("hub-copy", "复制当前组为新组名", g.name + "-copy", (name) => {
+      if (!name) return;
+      if (t.presets.some((p) => p.name === name)) {
+        _deiiaMsg("hub-copy-dup", `组「${name}」已存在`);
+        return;
+      }
+      t.presets.push({ name, files: JSON.parse(JSON.stringify(g.files || {})) });
+      node._hubGroup = name;
+      writeTable(node, t);
+    });
   }));
   bar.appendChild(mkBtn("删组", () => {
     const t = readTable(node); const name = node._hubGroup || "";
-    if (!confirm(`删除组「${name}」？`)) return;
-    t.presets = t.presets.filter((p) => p.name !== name);
-    writeTable(node, t);
+    _deiiaConfirm("hub-del", `删除组「${name}」？`, () => {
+      t.presets = t.presets.filter((p) => p.name !== name);
+      writeTable(node, t);
+    });
   }));
   root.appendChild(bar);
   root.appendChild(body);
@@ -189,7 +201,7 @@ function refreshPanel(node) {
     if (k === "文本编码") {
       const typeBtn = mkBtn(`type:${ent.type || "未设"}`, async () => {
         const items = await fetchClipTypes();
-        if (!items.length) { alert("拉不到 CLIPLoader 的 type 候选"); return; }
+        if (!items.length) { _deiiaMsg("hub-clip-empty", "拉不到 CLIPLoader 的 type 候选"); return; }
         const v = await pickFromList("文本编码 type（CLIPLoader 分类）", items, ent.type || "");
         if (v != null) { ent.type = v; writeTable(node, t); }
       });
@@ -398,3 +410,73 @@ app.registerExtension({
     };
   },
 });
+
+// —— 内联输入/消息弹层（浏览器 prompt/alert/confirm 会被页面拦截，改用自定义弹层）——
+function _deiiaModal(tag, html, onMount) {
+  const mask = document.createElement("div");
+  mask.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99998;";
+  const box = document.createElement("div");
+  box.dataset.deiiaModal = tag;
+  box.style.cssText = "position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);"
+    + "background:#22222a;color:#ddd;border:1px solid #4a4a55;border-radius:8px;"
+    + "padding:12px 14px;z-index:99999;min-width:280px;box-shadow:0 6px 24px rgba(0,0,0,.5);font-size:12px;";
+  box.innerHTML = html;
+  mask.appendChild(box);
+  document.body.appendChild(mask);
+  const close = () => mask.remove();
+  mask.addEventListener("click", (e) => { if (e.target === mask) close(); });
+  onMount(box, close);
+}
+
+function _deiiaAsk(tag, title, initial, onOk) {
+  _deiiaModal(tag, `<div style="margin-bottom:8px;">${title}</div>`, (box, close) => {
+    const input = document.createElement("input");
+    input.value = initial || "";
+    input.style.cssText = "width:100%;box-sizing:border-box;background:#16161c;color:#eee;"
+      + "border:1px solid #4a4a55;border-radius:4px;padding:4px 8px;margin-bottom:10px;";
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;gap:8px;justify-content:flex-end;";
+    const ok = document.createElement("button");
+    ok.textContent = "确定";
+    ok.style.cssText = "cursor:pointer;padding:3px 14px;background:#2f6f3f;color:#fff;border:none;border-radius:4px;";
+    const cancel = document.createElement("button");
+    cancel.textContent = "取消";
+    cancel.style.cssText = "cursor:pointer;padding:3px 14px;background:#3a3a44;color:#ccc;border:none;border-radius:4px;";
+    row.append(cancel, ok);
+    box.append(input, row);
+    const submit = () => { const v = input.value.trim(); close(); if (v) onOk(v); };
+    ok.onclick = submit;
+    input.onkeydown = (e) => {
+      if (e.key === "Enter") submit();
+      if (e.key === "Escape") close();
+    };
+    setTimeout(() => { input.focus(); input.select(); }, 30);
+  });
+}
+
+function _deiiaMsg(tag, msg) {
+  _deiiaModal(tag, `<div style="margin-bottom:10px;">${msg}</div>`, (box, close) => {
+    const ok = document.createElement("button");
+    ok.textContent = "知道了";
+    ok.style.cssText = "cursor:pointer;padding:3px 14px;background:#3a3a44;color:#ccc;border:none;border-radius:4px;";
+    ok.onclick = close;
+    box.append(ok);
+  });
+}
+
+function _deiiaConfirm(tag, msg, onOk) {
+  _deiiaModal(tag, `<div style="margin-bottom:10px;">${msg}</div>`, (box, close) => {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;gap:8px;justify-content:flex-end;";
+    const ok = document.createElement("button");
+    ok.textContent = "确定";
+    ok.style.cssText = "cursor:pointer;padding:3px 14px;background:#8a3030;color:#fff;border:none;border-radius:4px;";
+    const cancel = document.createElement("button");
+    cancel.textContent = "取消";
+    cancel.style.cssText = "cursor:pointer;padding:3px 14px;background:#3a3a44;color:#ccc;border:none;border-radius:4px;";
+    ok.onclick = () => { close(); onOk(); };
+    cancel.onclick = close;
+    row.append(cancel, ok);
+    box.append(row);
+  });
+}

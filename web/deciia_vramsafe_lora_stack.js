@@ -587,12 +587,15 @@ function rebuildPanel(node) {
     mk.appendChild(ml);
     mk.onclick = (ev) => {
       ev.stopPropagation(); closeTreePopup();
-      const name = (prompt("新组名（如 qwen2.1 / krea2）", `组${(node._dvzPresets || []).length + 1}`) || "").trim();
-      if (!name) return;
-      if ((node._dvzPresets || []).some((g) => g.name === name)) return alert(`组「${name}」已存在`);
-      _applyRowsToGroup(node);
-      node._dvzPresets.push({ name, rows: [] });
-      _switchGroup(node, name);
+      _deiiaAsk("dvz-new", "新组名（如 qwen2.1 / krea2）", `组${(node._dvzPresets || []).length + 1}`, (name) => {
+        if ((node._dvzPresets || []).some((g) => g.name === name)) {
+          _deiiaMsg("dvz-new-dup", `组「${name}」已存在`);
+          return;
+        }
+        _applyRowsToGroup(node);
+        node._dvzPresets.push({ name, rows: [] });
+        _switchGroup(node, name);
+      });
     };
     menu.appendChild(mk);
     const rn = document.createElement("div");
@@ -605,13 +608,17 @@ function rebuildPanel(node) {
       ev.stopPropagation(); closeTreePopup();
       const g = node._dvzPresets?.find((x) => x.name === node._dvzGroup);
       if (!g) return;
-      const name = (prompt("组改名", g.name) || "").trim();
-      if (!name || name === g.name) return;
-      if (node._dvzPresets.some((x) => x.name === name)) return alert(`组「${name}」已存在`);
-      g.name = name;
-      node._dvzGroup = name;
-      rebuildPanel(node);
-      syncConfig(node);
+      _deiiaAsk("dvz-rename", "组改名", g.name, (name) => {
+        if (!name || name === g.name) return;
+        if (node._dvzPresets.some((x) => x.name === name)) {
+          _deiiaMsg("dvz-rename-dup", `组「${name}」已存在`);
+          return;
+        }
+        g.name = name;
+        node._dvzGroup = name;
+        rebuildPanel(node);
+        syncConfig(node);
+      });
     };
     menu.appendChild(rn);
     const dl = document.createElement("div");
@@ -622,10 +629,14 @@ function rebuildPanel(node) {
     dl.appendChild(dll);
     dl.onclick = (ev) => {
       ev.stopPropagation(); closeTreePopup();
-      if ((node._dvzPresets || []).length <= 1) return alert("至少保留一个组");
-      if (!confirm(`删除组「${node._dvzGroup}」？`)) return;
-      node._dvzPresets = node._dvzPresets.filter((g) => g.name !== node._dvzGroup);
-      _switchGroup(node, node._dvzPresets[0].name);
+      if ((node._dvzPresets || []).length <= 1) {
+        _deiiaMsg("dvz-del-min", "至少保留一个组");
+        return;
+      }
+      _deiiaConfirm("dvz-del", `删除组「${node._dvzGroup}」？`, () => {
+        node._dvzPresets = node._dvzPresets.filter((g) => g.name !== node._dvzGroup);
+        _switchGroup(node, node._dvzPresets[0].name);
+      });
     };
     menu.appendChild(dl);
     document.body.appendChild(menu);
@@ -817,3 +828,73 @@ app.registerExtension({
     };
   },
 });
+
+// —— 内联输入/消息弹层（浏览器 prompt/alert/confirm 会被页面拦截，改用自定义弹层）——
+function _deiiaModal(tag, html, onMount) {
+  const mask = document.createElement("div");
+  mask.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99998;";
+  const box = document.createElement("div");
+  box.dataset.deiiaModal = tag;
+  box.style.cssText = "position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);"
+    + "background:#22222a;color:#ddd;border:1px solid #4a4a55;border-radius:8px;"
+    + "padding:12px 14px;z-index:99999;min-width:280px;box-shadow:0 6px 24px rgba(0,0,0,.5);font-size:12px;";
+  box.innerHTML = html;
+  mask.appendChild(box);
+  document.body.appendChild(mask);
+  const close = () => mask.remove();
+  mask.addEventListener("click", (e) => { if (e.target === mask) close(); });
+  onMount(box, close);
+}
+
+function _deiiaAsk(tag, title, initial, onOk) {
+  _deiiaModal(tag, `<div style="margin-bottom:8px;">${title}</div>`, (box, close) => {
+    const input = document.createElement("input");
+    input.value = initial || "";
+    input.style.cssText = "width:100%;box-sizing:border-box;background:#16161c;color:#eee;"
+      + "border:1px solid #4a4a55;border-radius:4px;padding:4px 8px;margin-bottom:10px;";
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;gap:8px;justify-content:flex-end;";
+    const ok = document.createElement("button");
+    ok.textContent = "确定";
+    ok.style.cssText = "cursor:pointer;padding:3px 14px;background:#2f6f3f;color:#fff;border:none;border-radius:4px;";
+    const cancel = document.createElement("button");
+    cancel.textContent = "取消";
+    cancel.style.cssText = "cursor:pointer;padding:3px 14px;background:#3a3a44;color:#ccc;border:none;border-radius:4px;";
+    row.append(cancel, ok);
+    box.append(input, row);
+    const submit = () => { const v = input.value.trim(); close(); if (v) onOk(v); };
+    ok.onclick = submit;
+    input.onkeydown = (e) => {
+      if (e.key === "Enter") submit();
+      if (e.key === "Escape") close();
+    };
+    setTimeout(() => { input.focus(); input.select(); }, 30);
+  });
+}
+
+function _deiiaMsg(tag, msg) {
+  _deiiaModal(tag, `<div style="margin-bottom:10px;">${msg}</div>`, (box, close) => {
+    const ok = document.createElement("button");
+    ok.textContent = "知道了";
+    ok.style.cssText = "cursor:pointer;padding:3px 14px;background:#3a3a44;color:#ccc;border:none;border-radius:4px;";
+    ok.onclick = close;
+    box.append(ok);
+  });
+}
+
+function _deiiaConfirm(tag, msg, onOk) {
+  _deiiaModal(tag, `<div style="margin-bottom:10px;">${msg}</div>`, (box, close) => {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;gap:8px;justify-content:flex-end;";
+    const ok = document.createElement("button");
+    ok.textContent = "确定";
+    ok.style.cssText = "cursor:pointer;padding:3px 14px;background:#8a3030;color:#fff;border:none;border-radius:4px;";
+    const cancel = document.createElement("button");
+    cancel.textContent = "取消";
+    cancel.style.cssText = "cursor:pointer;padding:3px 14px;background:#3a3a44;color:#ccc;border:none;border-radius:4px;";
+    ok.onclick = () => { close(); onOk(); };
+    cancel.onclick = close;
+    row.append(cancel, ok);
+    box.append(row);
+  });
+}
