@@ -2,7 +2,7 @@
 """Deiia 视频模型加载器 · 四合一预设（视频生成专用，MiniMax-H3 优先）。
 
 固定四项加载：UNet / CLIP / 视频 VAE / 音频 VAE；固定四个输出槽。
-预设（多套文件组合）由前端面板管理，保存在工作流的 presets_json 控件里。
+预设（多套文件组合）由前端管理：preset_name 下拉切换，⚙ 菜单做增删改。
 CLIP 加载类型默认 minimax（H3 文本编码器）。
 """
 
@@ -27,7 +27,7 @@ def _opts(folder):
 _CLIP_TYPES = ["minimax", "stable_diffusion"]
 try:
     from comfy.sd import CLIPType as _CLIPType
-    _CLIP_TYPES = [m.value if isinstance(m.value, str) else m.name for m in _CLIPType]
+    _CLIP_TYPES = [(m.value if isinstance(m.value, str) else m.name).lower() for m in _CLIPType]
 except Exception:
     pass
 
@@ -52,7 +52,7 @@ class DeciiaVideoModelLoader(io.ComfyNode):
             category="Deciia/local",
             description=(
                 "视频生成模型四合一加载器：UNet / CLIP / 视频 VAE / 音频 VAE 一次加载，"
-                "支持多预设切换（前端面板管理）。CLIP 类型默认 minimax（MiniMax-H3 文本编码器）。"
+                "支持多预设切换（preset_name 下拉切换；⚙ 菜单管理预设）。"
                 "四个输出可直接对接 easy modelLoaderPack 或各自的采样输入。"
             ),
             inputs=[
@@ -88,10 +88,14 @@ class DeciiaVideoModelLoader(io.ComfyNode):
             raise RuntimeError(f"UNet 加载失败: {unet_name}")
 
         clip_path = folder_paths.get_full_path_or_raise("text_encoders", clip_name)
+        clip_type_enum = clip_type
         try:
             clip_type_enum = comfy.sd.CLIPType(clip_type)
         except Exception:
-            clip_type_enum = clip_type
+            try:
+                clip_type_enum = comfy.sd.CLIPType[clip_type.upper()]
+            except Exception:
+                clip_type_enum = clip_type  # 交给下游按原样处理
         clip = comfy.sd.load_clip(
             ckpt_paths=[clip_path],
             embedding_directory=folder_paths.get_full_path("embeddings", None),
@@ -102,7 +106,6 @@ class DeciiaVideoModelLoader(io.ComfyNode):
 
         video_vae = comfy.sd.VAE(sd=comfy.utils.load_torch_file(
             folder_paths.get_full_path_or_raise("vae", video_vae_name)))
-
         audio_vae = comfy.sd.VAE(sd=comfy.utils.load_torch_file(
             folder_paths.get_full_path_or_raise("vae", audio_vae_name)))
 
