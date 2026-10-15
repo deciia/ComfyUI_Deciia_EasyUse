@@ -95,3 +95,15 @@ try:
 except Exception as _e:
     import logging
     logging.getLogger(__name__).warning("[DeciiaEasyUse] deciia_local 加载失败: %s", _e)
+
+# --- Deiia 视频模型加载器 · 四合一预设（2026-10-16）---
+try:
+    from .video_model_loader import (
+        NODE_CLASS_MAPPINGS as _vml_class,
+        NODE_DISPLAY_NAME_MAPPINGS as _vml_display,
+    )
+    NODE_CLASS_MAPPINGS.update(_vml_class)
+    NODE_DISPLAY_NAME_MAPPINGS.update(_vml_display)
+except Exception as _e:
+    import logging
+    logging.getLogger(__name__).warning("[DeciiaEasyUse] video_model_loader 加载失败: %s", _e)
