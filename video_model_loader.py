@@ -60,13 +60,17 @@ class DeciiaVideoModelLoader(io.ComfyNode):
                                tooltip="UNet / 扩散模型权重（diffusion_models 目录）。"),
                 io.Combo.Input("clip_name", options=_opts("text_encoders"),
                                tooltip="文本编码器权重（text_encoders 目录）。"),
+                io.Combo.Input("video_vae_name", options=_opts("vae"),
+                               default="minimax_h3_video_vae_fp16.safetensors",
+                               tooltip="视频 VAE 权重（vae 目录）。"),
+                io.Combo.Input("audio_vae_name", options=_opts("vae"),
+                               default="minimax_h3_audio_vae_fp32.safetensors",
+                               tooltip="音频 VAE 权重（vae 目录）。"),
                 io.String.Input("presets_json", default=json.dumps(_DEFAULT_PRESETS, ensure_ascii=False),
                                 multiline=True, advanced=True,
                                 tooltip="预设数据（前端面板自动维护，一般不用手改）。"),
                 io.Combo.Input("clip_type", options=_CLIP_TYPES, default="minimax", advanced=True,
                                tooltip="CLIP 加载类型。MiniMax-H3 用 minimax。"),
-                io.Boolean.Input("load_audio_vae", default=True, advanced=True,
-                                 tooltip="关闭则不加载音频 VAE（纯画面工作流可省一次读盘）。"),
             ],
             outputs=[
                 io.Model.Output(display_name="模型"),
@@ -78,7 +82,7 @@ class DeciiaVideoModelLoader(io.ComfyNode):
 
     @classmethod
     def execute(cls, unet_name, clip_name, video_vae_name, audio_vae_name,
-                clip_type="minimax", load_audio_vae=True, presets_json="") -> io.NodeOutput:
+                clip_type="minimax", presets_json="") -> io.NodeOutput:
         model = comfy.sd.load_diffusion_model(folder_paths.get_full_path_or_raise("diffusion_models", unet_name))
         if model is None:
             raise RuntimeError(f"UNet 加载失败: {unet_name}")
@@ -99,10 +103,8 @@ class DeciiaVideoModelLoader(io.ComfyNode):
         video_vae = comfy.sd.VAE(sd=comfy.utils.load_torch_file(
             folder_paths.get_full_path_or_raise("vae", video_vae_name)))
 
-        audio_vae = None
-        if load_audio_vae:
-            audio_vae = comfy.sd.VAE(sd=comfy.utils.load_torch_file(
-                folder_paths.get_full_path_or_raise("vae", audio_vae_name)))
+        audio_vae = comfy.sd.VAE(sd=comfy.utils.load_torch_file(
+            folder_paths.get_full_path_or_raise("vae", audio_vae_name)))
 
         return io.NodeOutput(model, clip, video_vae, audio_vae)
 
