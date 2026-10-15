@@ -89,7 +89,9 @@ __all__ = [
 
 # --- deciia_local 子包（ServiceBridge/路由门禁/Lazy 路由/模型枢纽/导演台；2026-10-16 并入 ComfyUI_Deciia_Local）---
 try:
-    from . import deciia_local as _deciia_local  # noqa: F401  (含节点注册与服务路由)
+    from . import deciia_local as _deciia_local
+    NODE_CLASS_MAPPINGS.update(_deciia_local.NODE_CLASS_MAPPINGS)
+    NODE_DISPLAY_NAME_MAPPINGS.update(_deciia_local.NODE_DISPLAY_NAME_MAPPINGS)
 except Exception as _e:
     import logging
     logging.getLogger(__name__).warning("[DeciiaEasyUse] deciia_local 加载失败: %s", _e)

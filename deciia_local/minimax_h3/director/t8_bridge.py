@@ -36,8 +36,13 @@ _upstream: types.ModuleType | None = None
 
 
 def _custom_nodes() -> Path:
-    # .../custom_nodes/ComfyUI_Deciia_Local/minimax_h3/director/t8_bridge.py
-    return HERE.parents[2]
+    """向上逐级寻找 custom_nodes 目录（兼容包在任意层级深度的安装）。"""
+    p = HERE
+    for parent in HERE.parents:
+        if parent.name == "custom_nodes":
+            return parent
+        p = parent
+    raise RuntimeError(f"custom_nodes 目录未找到（自 {HERE} 向上）")
 
 
 def upstream_dir() -> Path:
