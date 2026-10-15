@@ -863,6 +863,7 @@ function _deiiaAsk(tag, title, initial, onOk) {
     row.append(cancel, ok);
     box.append(input, row);
     const submit = () => { const v = input.value.trim(); close(); if (v) onOk(v); };
+    cancel.onclick = close;
     ok.onclick = submit;
     input.onkeydown = (e) => {
       if (e.key === "Enter") submit();
