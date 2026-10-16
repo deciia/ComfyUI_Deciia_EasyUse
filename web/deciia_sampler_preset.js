@@ -71,7 +71,9 @@ function _spxConfirm(msg, onOk) {
   });
 }
 
-const SPX_KEYS = ["sampler_name", "scheduler", "steps", "denoise"];
+const SPX_KEYS = ["sampler_name", "scheduler", "steps", "denoise", "custom_sigmas"];
+
+function _spxKey(p) { return (p.group || "未分组") + "::" + p.name; }
 const SPX_KEYS2 = ["p2_sampler_name", "p2_scheduler", "p2_steps", "p2_denoise"];
 
 function _spxWidget(node, name) {
@@ -153,8 +155,8 @@ function _spxMenu(node, anchor) {
   Object.entries(groups).forEach(([g, ps]) => {
     addHeader(g);
     ps.forEach((p) => {
-      addItem(p.name, `${p.steps}步·${p.scheduler}`, p.name === data.current, () => {
-        data.current = p.name;
+      addItem(p.name, `${p.steps}步·${p.scheduler}`, _spxKey(p) === data.current, () => {
+        data.current = _spxKey(p);
         _spxWrite(node, data);
         _spxApply(node, p);
         refreshGear(node);
@@ -171,9 +173,9 @@ function _spxMenu(node, anchor) {
       }
       const group = src ? (src.group || "未分组") : "未分组";
       data.presets.push(JSON.parse(JSON.stringify({ ...(src || {}), name, group })));
-      data.current = name;
+      data.current = group + "::" + name;
       _spxWrite(node, data);
-      const p = data.presets.find((x) => x.name === name);
+      const p = data.presets.find((x) => _spxKey(x) === data.current);
       if (p) _spxApply(node, p);
       refreshGear(node);
     });
@@ -187,7 +189,7 @@ function _spxMenu(node, anchor) {
         _spxMsg(`预设「${name}」已存在`);
         return;
       }
-      p.name = name; data.current = name;
+      p.name = name; data.current = _spxKey(p);
       _spxWrite(node, data);
       refreshGear(node);
     });
@@ -197,11 +199,11 @@ function _spxMenu(node, anchor) {
       _spxMsg("至少保留一个预设");
       return;
     }
-    _spxConfirm(`删除预设「${data.current}」？`, () => {
-      data.presets = data.presets.filter((x) => x.name !== data.current);
-      data.current = data.presets[0].name;
+    _spxConfirm(`删除预设「${data.current.split("::")[1]}」？（分组：${data.current.split("::")[0]}）`, () => {
+      data.presets = data.presets.filter((x) => _spxKey(x) !== data.current);
+      data.current = _spxKey(data.presets[0]);
       _spxWrite(node, data);
-      const p = data.presets.find((x) => x.name === data.current);
+      const p = data.presets.find((x) => _spxKey(x) === data.current);
       if (p) _spxApply(node, p);
       refreshGear(node);
     });
@@ -226,8 +228,8 @@ function refreshGear(node) {
   if (btn) {
     const d = _spDataSafe(node);
     if (d) {
-      const p = d.presets.find((x) => x.name === d.current);
-      btn.textContent = p ? `⚙ ${p.group || ""} / ${d.current}` : "⚙ 预设管理";
+      const p = d.presets.find((x) => _spxKey(x) === d.current);
+      btn.textContent = p ? `⚙ ${p.group} / ${p.name}` : "⚙ 预设管理";
     }
   }
 }
@@ -252,7 +254,7 @@ app.registerExtension({
       const orig = w.callback;
       w.callback = function (v) {
         const d = _spxData(node);
-        const p = d && d.presets.find((x) => x.name === d.current);
+        const p = d && d.presets.find((x) => _spxKey(x) === d.current);
         if (p && p[k] !== v) { p[k] = v; _spxWrite(node, d); }
         if (orig) return orig.call(this, v);
       };
@@ -288,7 +290,7 @@ app.registerExtension({
     node.onConfigure = () => {
       const d = _spxData(node);
       if (d) {
-        if (!d.presets.some((x) => x.name === d.current)) d.current = d.presets[0].name;
+        if (!d.presets.some((x) => _spxKey(x) === d.current)) d.current = _spxKey(d.presets[0]);
         refreshGear(node);
       }
     };
