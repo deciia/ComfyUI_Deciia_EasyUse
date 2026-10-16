@@ -1,6 +1,6 @@
-// Deiia 采样预设 · 采样器+调度器 — ⚙ 菜单管理预设（与加载器同款交互）。
-// 预设数据经 DOM 控件 getValue/setValue 序列化（可靠路径，不依赖隐藏控件）。
-// 弹层使用页面内自定义实现（浏览器 prompt/alert/confirm 会被拦截）。
+// Deiia 采样预设 · 采样器+调度器 — ⚙ 菜单管理预设。
+// scheduler 为 DynamicCombo（原生联动显隐：custom→自定义 Sigma 框；标准调度器→steps/denoise）。
+// 预设数据存 node.properties（随节点保存/恢复）。弹层为页面内自定义实现（原生对话框会被浏览器拦截）。
 import { app } from "../../../scripts/app.js";
 
 function _spModal(html, onMount) {
@@ -72,13 +72,13 @@ function _spConfirm(msg, onOk) {
   });
 }
 
-const SP_KEYS = ["sampler_name"];
-
 function _spWidget(node, name) {
   return node.widgets?.find((w) => w.name === name);
 }
 
-// 预设数据存在 node.properties（永远随节点保存/恢复，可靠路径）
+function _spKey(p) { return (p.group || "通用") + "::" + p.name; }
+
+// 预设数据存 node.properties（随节点保存/恢复）
 function _spData(node) {
   try {
     const d = JSON.parse(node.properties?.deiia_sp_data || "{}");
@@ -97,9 +97,13 @@ function _spWrite(node, data) {
   if (app.graph) app.graph.setDirtyCanvas(true, true);
 }
 
-function _spKey(p) { return (p.group || "通用") + "::" + p.name; }
-
+// 应用预设：sampler_name 直接写；scheduler（DynamicCombo dict）构造后写
 function _spApply(node, p) {
+  const sw = _spWidget(node, "sampler_name");
+  if (sw && p.sampler_name != null) {
+    sw.value = p.sampler_name;
+    if (sw.callback) sw.callback(sw.value);
+  }
   const schW = _spWidget(node, "scheduler");
   if (schW && p.scheduler) {
     const cur = (typeof schW.value === "object" && schW.value) ? { ...schW.value } : {};
@@ -113,11 +117,6 @@ function _spApply(node, p) {
     schW.value = cur;
     if (schW.callback) schW.callback(cur);
   }
-  const sw = _spWidget(node, "sampler_name");
-  if (sw && p.sampler_name != null) {
-    sw.value = p.sampler_name;
-    if (sw.callback) sw.callback(sw.value);
-  }
   app.graph.setDirtyCanvas(true, true);
 }
 
@@ -130,7 +129,7 @@ function _spMenu(node, anchor) {
     + "box-shadow:0 6px 24px rgba(0,0,0,.5);font-size:12px;";
   const close = () => menu.remove();
 
-  const addItem = (label, hint, isCur, fn) => {
+  const addItem = (label, isCur, fn) => {
     const it = document.createElement("div");
     it.style.cssText = "display:flex;justify-content:space-between;align-items:center;"
       + "padding:5px 12px;cursor:pointer;border-radius:5px;";
@@ -138,11 +137,13 @@ function _spMenu(node, anchor) {
     it.onmouseleave = () => { it.style.background = "transparent"; };
     const l = document.createElement("span");
     l.textContent = label;
-    const h = document.createElement("span");
-    h.style.cssText = "color:#888;font-size:11px;";
-    h.textContent = hint || "";
-    if (isCur) h.textContent = "✓";
-    it.append(l, h);
+    it.appendChild(l);
+    if (isCur) {
+      const ck = document.createElement("span");
+      ck.style.cssText = "color:#7fbf7f;font-size:11px;";
+      ck.textContent = "✓";
+      it.appendChild(ck);
+    }
     it.onclick = (e) => { e.stopPropagation(); close(); fn(); };
     menu.appendChild(it);
   };
@@ -159,7 +160,7 @@ function _spMenu(node, anchor) {
   });
   Object.entries(groups).forEach(([g, ps]) => {
     ps.forEach((p) => {
-      addItem(`${g} / ${p.name}`, "", _spKey(p) === data.current, () => {
+      addItem(`${g} / ${p.name}`, _spKey(p) === data.current, () => {
         data.current = _spKey(p);
         _spWrite(node, data);
         _spApply(node, p);
@@ -168,10 +169,10 @@ function _spMenu(node, anchor) {
     });
   });
   addSep();
-  addItem("＋ 新预设（复制当前）", "", false, () => {
+  addItem("＋ 新预设（复制当前）", false, () => {
     const src = data.presets.find((x) => _spKey(x) === data.current);
     _spAsk("新预设名", (src ? src.name : "预设") + "-copy", (name) => {
-      if (data.presets.some((x) => _spKey(x) === name)) {
+      if (data.presets.some((x) => x.name === name && (x.group || "通用") === (src ? (src.group || "通用") : "通用"))) {
         _spMsg(`预设「${name}」已存在`);
         return;
       }
@@ -183,12 +184,12 @@ function _spMenu(node, anchor) {
       refreshGear(node);
     });
   });
-  addItem("✎ 改名", "", false, () => {
+  addItem("✎ 改名", false, () => {
     const p = data.presets.find((x) => _spKey(x) === data.current);
     if (!p) return;
     _spAsk("重命名预设", p.name, (name) => {
       if (!name || name === p.name) return;
-      if (data.presets.some((x) => x.name === name && x.group === p.group)) {
+      if (data.presets.some((x) => x.name === name && (x.group || "通用") === (p.group || "通用"))) {
         _spMsg(`预设「${name}」已存在`);
         return;
       }
@@ -197,7 +198,7 @@ function _spMenu(node, anchor) {
       refreshGear(node);
     });
   });
-  addItem("✕ 删除当前预设", "", false, () => {
+  addItem("✕ 删除当前预设", false, () => {
     if (data.presets.length <= 1) {
       _spMsg("至少保留一个预设");
       return;
@@ -236,36 +237,34 @@ function refreshGear(node) {
   btn.textContent = p ? `⚙ ${p.name}` : "⚙ 预设";
 }
 
+// 从控件当前值抓取预设扁平字段（新建/回写用）
+function _spCapture(node) {
+  const out = {};
+  const sw = _spWidget(node, "sampler_name");
+  if (sw) out.sampler_name = sw.value;
+  const schW = _spWidget(node, "scheduler");
+  if (schW && typeof schW.value === "object" && schW.value) {
+    out.scheduler = schW.value.scheduler || "beta";
+    if (out.scheduler === "custom") out.custom_sigmas = schW.value.custom_sigmas || "";
+    else {
+      out.steps = schW.value.steps != null ? schW.value.steps : 4;
+      out.denoise = schW.value.denoise != null ? schW.value.denoise : 1.0;
+    }
+  }
+  return out;
+}
+
 app.registerExtension({
   name: "DeciiaSamplerPreset",
   nodeCreated(node) {
     if (node.comfyClass !== "DeciiaSamplerPreset") return;
 
-    if (!node._spData) node._spData = { current: "通用", presets: [{
-      name: "通用", group: "通用",
-      sampler_name: "euler", scheduler: "beta", steps: 4, denoise: 1.0,
-    }] };
-
-    
-    // scheduler（DynamicCombo dict）变化 -> 提取扁平字段写回当前预设
-    const _schW = _spWidget(node, "scheduler");
-    if (_schW) {
-      const _orig = _schW.callback;
-      _schW.callback = function (v) {
-        const d = _spxData(node);
-        const p = d && d.presets.find((x) => _spxKey(x) === d.current);
-        if (p && v && typeof v === "object") {
-          const sel = v.scheduler;
-          if (sel && sel !== p.scheduler) { p.scheduler = sel; }
-          if (sel === "custom") p.custom_sigmas = v.custom_sigmas || "";
-          else {
-            if (v.steps != null) p.steps = v.steps;
-            if (v.denoise != null) p.denoise = v.denoise;
-          }
-          _spxWrite(node, d);
-        }
-        if (_orig) return _orig.call(this, v);
-      };
+    // 预设数据种子（properties 为空时）
+    if (!node.properties.deiia_sp_data) {
+      node.properties.deiia_sp_data = JSON.stringify({
+        current: "通用",
+        presets: [{ name: "通用", group: "通用", sampler_name: "euler", scheduler: "beta", steps: 4, denoise: 1.0 }],
+      });
     }
 
     // ⚙ 菜单按钮（挪到节点最上方）
@@ -283,8 +282,6 @@ app.registerExtension({
     bar.appendChild(gear);
 
     const domW = node.addDOMWidget("预设管理", "deciia.sp.bar", bar, { getValue: () => "", setValue: () => {} });
-    node._spDomWidget = domW;
-    // 挪到节点最上方（加载下拉之前）
     try {
       const idx = node.widgets.indexOf(domW);
       if (idx > 0) {
@@ -295,30 +292,26 @@ app.registerExtension({
       }
     } catch (e) {}
 
-    // 显隐配方照抄 lazy_model_router.js（1.54.7 前端已验证）：
-    // 隐 = computeSize 覆写 [0,-4] + hidden=true；显 = 恢复原 computeSize + hidden=false；
-    // 末尾强制尺寸重算。注意：挂载前不能 hidden（行没进过 DOM 就永远无法复显），
-    // 所以首次同步必须延迟到挂载后。
-    if (schW) {
-      const origSch = schW.callback;
-      schW.callback = function (v) {
-        if (origSch) return origSch.call(this, v);
+    // sampler_name / scheduler 控件变化 -> 写回当前预设
+    for (const name of ["sampler_name", "scheduler"]) {
+      const w = _spWidget(node, name);
+      if (!w) continue;
+      const orig = w.callback;
+      w.callback = function (v) {
+        const d = _spData(node);
+        const p = d && d.presets.find((x) => _spKey(x) === d.current);
+        if (p) {
+          Object.assign(p, _spCapture(node));
+          _spWrite(node, d);
+        }
+        if (orig) return orig.call(this, v);
       };
     }
 
-    // 工作流数据灌入后刷新按钮
+    // 工作流数据灌入后刷新按钮与预设应用
     node.onConfigure = () => {
-      refreshGear(node);
-    // 工作流数据灌入后：回填当前预设全部控件值（自愈）+ 刷新按钮与显隐
-    node.onConfigure = () => {
-      const d = _spxData(node);
-      if (d) {
-        const p = d.presets.find((x) => _spxKey(x) === d.current);
-        if (p) _spxApply(node, p);
-      }
       refreshGear(node);
     };
     refreshGear(node);
-    // 首次同步延迟到挂载后（行先进 DOM，才能被 hidden 移除/复显）
   },
 });
