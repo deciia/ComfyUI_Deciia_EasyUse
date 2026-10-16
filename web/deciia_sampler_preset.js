@@ -262,21 +262,17 @@ app.registerExtension({
       }
     } catch (e) {}
 
-    // scheduler=custom 显隐联动：custom 时隐藏 steps/denoise
+    // scheduler=custom 时 steps/denoise 置灰禁用（不参与执行；序列化不受影响）
     function spxSyncCustomVis() {
       const sch = _spWidget(node, "scheduler");
       const isCustom = !!sch && sch.value === "custom";
       for (const k of ["steps", "denoise"]) {
         const w = _spWidget(node, k);
         if (!w) continue;
-        if (isCustom) { w.computeSize = () => [0, -4]; }
-        else { try { delete w.computeSize; } catch (e) {} }
+        w.disabled = isCustom;
       }
       const cs = _spWidget(node, "custom_sigmas");
-      if (cs) {
-        if (isCustom) { try { delete cs.computeSize; } catch (e) {} }
-        else { cs.computeSize = () => [0, -4]; }
-      }
+      if (cs) cs.disabled = false;
       if (app.graph) app.graph.setDirtyCanvas(true, true);
     }
     const schW = _spWidget(node, "scheduler");
