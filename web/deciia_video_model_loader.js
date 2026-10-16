@@ -221,7 +221,7 @@ app.registerExtension({
 
     // 只隐藏 presets_json 数据控件；4 个加载下拉保持原生可见
     const pj = _vmlWidget(node, "presets_json");
-    if (pj) { pj.computeSize = () => [0, -4]; pj.hidden = true; }
+    if (pj) { pj.computeSize = () => [0, -4]; }  // 仅折叠尺寸；不设 hidden（hidden 会被前端跳过序列化，标签页切换即丢数据）
 
     // 原生下拉改动 -> 写回当前预设（否则切预设会丢改动）
     for (const k of ["unet_name", "clip_name", "video_vae_name", "audio_vae_name"]) {
