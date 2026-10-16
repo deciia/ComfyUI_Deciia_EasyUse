@@ -262,5 +262,14 @@ app.registerExtension({
         }
       }
     } catch (e) {}
+
+    // 工作流数据灌入后（configure 末尾）刷新按钮文字，并纠正无效的当前预设名
+    node.onConfigure = () => {
+      const d = _vmlData(node);
+      if (d) {
+        if (!d.presets.some((x) => x.name === d.current)) d.current = d.presets[0].name;
+        refreshCurBtn(node);
+      }
+    };
   },
 });
