@@ -263,19 +263,25 @@ app.registerExtension({
     } catch (e) {}
 
     // scheduler=custom 时隐藏 steps/denoise 只显示自定义 Sigma 框；非 custom 反之
-    // （值由预设数据在 onConfigure 回填自愈，隐藏不影响取值）
+    // （computeSize 折叠 + 强制节点尺寸重算；值由预设数据在 onConfigure 回填自愈）
     function spxSyncCustomVis() {
-      const sch = _spxWidget(node, "scheduler");
+      const sch = _spWidget(node, "scheduler");
       const isCustom = !!sch && sch.value === "custom";
-      for (const k of ["steps", "denoise"]) {
-        const w = _spxWidget(node, k);
-        if (!w) continue;
-        if (isCustom && !w._spOrigSize) w._spOrigSize = w.computeSize;
-        if (isCustom) { w.computeSize = () => [0, -4]; }
-        else if (w._spOrigSize) { w.computeSize = w._spOrigSize; w._spOrigSize = null; }
-      }
-      const cs = _spxWidget(node, "custom_sigmas");
-      if (cs) cs.hidden = !isCustom;
+      const flip = (w, hide) => {
+        if (!w) return;
+        if (hide && !w._spOrigSize) w._spOrigSize = w.computeSize;
+        if (hide) {
+          w.computeSize = () => [0, -4];
+          w.hidden = true;
+        } else {
+          if (w._spOrigSize) { w.computeSize = w._spOrigSize; w._spOrigSize = null; }
+          w.hidden = false;
+        }
+      };
+      flip(_spWidget(node, "steps"), isCustom);
+      flip(_spWidget(node, "denoise"), isCustom);
+      flip(_spWidget(node, "custom_sigmas"), !isCustom);
+      try { node.setSize(node.computeSize()); } catch (e) {}
       if (app.graph) app.graph.setDirtyCanvas(true, true);
     }
     const schW = _spWidget(node, "scheduler");
