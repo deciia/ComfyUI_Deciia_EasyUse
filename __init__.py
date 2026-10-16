@@ -107,3 +107,15 @@ try:
 except Exception as _e:
     import logging
     logging.getLogger(__name__).warning("[DeciiaEasyUse] video_model_loader 加载失败: %s", _e)
+
+# --- Deiia 采样预设 · 采样器+调度器（2026-10-16）---
+try:
+    from .sampler_preset import (
+        NODE_CLASS_MAPPINGS as _spx_class,
+        NODE_DISPLAY_NAME_MAPPINGS as _spx_display,
+    )
+    NODE_CLASS_MAPPINGS.update(_spx_class)
+    NODE_DISPLAY_NAME_MAPPINGS.update(_spx_display)
+except Exception as _e:
+    import logging
+    logging.getLogger(__name__).warning("[DeciiaEasyUse] sampler_preset 加载失败: %s", _e)
