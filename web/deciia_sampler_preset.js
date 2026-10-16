@@ -262,25 +262,27 @@ app.registerExtension({
       }
     } catch (e) {}
 
-    // scheduler=custom 时隐藏 steps/denoise 只显示自定义 Sigma 框；非 custom 反之
-    // （computeSize 折叠 + 强制节点尺寸重算；值由预设数据在 onConfigure 回填自愈）
+    // 显隐配方照抄 lazy_model_router.js（1.54.7 前端已验证）：
+    // 隐 = computeSize 覆写 [0,-4] + hidden=true；显 = 恢复原 computeSize + hidden=false；
+    // 末尾强制尺寸重算。注意：挂载前不能 hidden（行没进过 DOM 就永远无法复显），
+    // 所以首次同步必须延迟到挂载后。
     function spxSyncCustomVis() {
-      const sch = _spWidget(node, "scheduler");
+      const sch = _spxWidget(node, "scheduler");
       const isCustom = !!sch && sch.value === "custom";
       const flip = (w, hide) => {
         if (!w) return;
-        if (hide && !w._spOrigSize) w._spOrigSize = w.computeSize;
         if (hide) {
-          w.computeSize = () => [0, -4];
+          if (w._spOrigCS === undefined) w._spOrigCS = w.computeSize;
+          w.computeSize = function () { return [0, -4]; };
           w.hidden = true;
         } else {
-          if (w._spOrigSize) { w.computeSize = w._spOrigSize; w._spOrigSize = null; }
+          if (w._spOrigCS !== undefined) w.computeSize = w._spOrigCS;
           w.hidden = false;
         }
       };
-      flip(_spWidget(node, "steps"), isCustom);
-      flip(_spWidget(node, "denoise"), isCustom);
-      flip(_spWidget(node, "custom_sigmas"), !isCustom);
+      flip(_spxWidget(node, "steps"), isCustom);
+      flip(_spxWidget(node, "denoise"), isCustom);
+      flip(_spxWidget(node, "custom_sigmas"), !isCustom);
       try { node.setSize(node.computeSize()); } catch (e) {}
       if (app.graph) app.graph.setDirtyCanvas(true, true);
     }
@@ -308,6 +310,7 @@ app.registerExtension({
       spxSyncCustomVis();
     };
     refreshGear(node);
-    spxSyncCustomVis();
+    // 首次同步延迟到挂载后（行先进 DOM，才能被 hidden 移除/复显）
+    setTimeout(() => spxSyncCustomVis(), 50);
   },
 });
