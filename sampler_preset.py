@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Deiia 采样预设 · 采样器+调度器（DynamicCombo 原生显隐版）。
+"""Deiia 采样预设 · 采样器+调度器（稳定模式版）。
 
-输入模型，按当前预设输出 Sigmas 与采样器方案。scheduler 为 DynamicCombo：
-选 custom 只显示自定义 Sigma 输入框；选标准调度器显示 steps/denoise——
-显隐由前端原生处理（同 Deiia 稀疏注意力节点的 dense_mode 机制），无自定义 JS。
+输入模型，按当前预设输出 Sigmas 与采样器方案。全部为普通控件：
+scheduler 选 custom 时用自定义 Sigma 阶梯（空则明确报错），否则按 BasicScheduler 算法计算。
 Sigmas 计算逐字对齐内核 BasicScheduler；采样器对象逐字对齐 KSamplerSelect。
 """
+
+import json
 
 import torch
 import comfy.samplers
@@ -15,20 +16,14 @@ from comfy_api.latest import io
 NODE_CLASS_MAPPINGS = {}
 NODE_DISPLAY_NAME_MAPPINGS = {}
 
-
-def _scheduler_combo():
-    opts = [io.DynamicCombo.Option("custom", [
-        io.String.Input("custom_sigmas", default="",
-                        tooltip="自定义 Sigma 阶梯：逗号分隔数值（降序，含末位 0）。如 14.61,3.2,1.0,0"),
-    ])]
-    for s in comfy.samplers.SCHEDULER_NAMES:
-        opts.append(io.DynamicCombo.Option(s, [
-            io.Int.Input("steps", default=4, min=1, max=10000, tooltip="总步数。"),
-            io.Float.Input("denoise", default=1.0, min=0.0, max=1.0, step=0.01,
-                           tooltip="去噪强度（<1.0 按内核规则折算步数）。"),
-        ]))
-    return io.DynamicCombo.Input("scheduler", options=opts,
-                                 tooltip="调度器。选 custom 用自定义 Sigma 阶梯；选标准调度器按 steps/denoise 计算。")
+_DEFAULT_PRESETS = {
+    "current": "通用",
+    "presets": [{
+        "name": "通用", "group": "通用",
+        "sampler_name": "euler", "scheduler": "simple", "steps": 8, "denoise": 1.0,
+        "custom_sigmas": "",
+    }],
+}
 
 
 class DeciiaSamplerPreset(io.ComfyNode):
@@ -40,13 +35,24 @@ class DeciiaSamplerPreset(io.ComfyNode):
             category="Deciia/local",
             description=(
                 "采样设置预设：输入模型，按当前预设输出 Sigmas 与采样器方案。"
-                "scheduler 选 custom 只显示自定义 Sigma 框，选标准调度器显示 steps/denoise（原生联动显隐）。"
+                "scheduler 选 custom 用自定义 Sigma 阶梯，否则按 steps/denoise 计算。"
+                "多预设由 ⚙ 菜单管理。"
             ),
             inputs=[
                 io.Model.Input("model"),
                 io.Combo.Input("sampler_name", options=comfy.samplers.SAMPLER_NAMES, default="euler",
                                tooltip="采样器方案（预设切换时自动同步）。"),
-                _scheduler_combo(),
+                io.Combo.Input("scheduler", options=["custom"] + comfy.samplers.SCHEDULER_NAMES,
+                               default="simple",
+                               tooltip="调度器。选 custom 时使用自定义 Sigma 阶梯。"),
+                io.Int.Input("steps", default=8, min=1, max=10000, tooltip="总步数。"),
+                io.Float.Input("denoise", default=1.0, min=0.0, max=1.0, step=0.01,
+                               tooltip="去噪强度（<1.0 按内核规则折算步数）。"),
+                io.String.Input("custom_sigmas", default="",
+                                tooltip="自定义 Sigma 阶梯：逗号分隔数值（降序，含末位 0），仅 scheduler=custom 时显示并生效。如 14.61,3.2,1.0,0"),
+                io.String.Input("presets_json", default=json.dumps(_DEFAULT_PRESETS, ensure_ascii=False),
+                                multiline=True, advanced=True,
+                                tooltip="预设数据（前端 ⚙ 菜单自动维护，一般不用手改）。"),
             ],
             outputs=[
                 io.Sigmas.Output(display_name="Sigmas"),
@@ -55,14 +61,11 @@ class DeciiaSamplerPreset(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, model, sampler_name, scheduler) -> io.NodeOutput:
+    def execute(cls, model, sampler_name, scheduler, steps, denoise, custom_sigmas="", presets_json="") -> io.NodeOutput:
         sampler = comfy.samplers.sampler_object(sampler_name)
 
-        # DynamicCombo 解包：dict 以组合 id 为键（见 _io.py DynamicCombo）
-        sel = scheduler.get("scheduler", "beta") if isinstance(scheduler, dict) else scheduler
-
-        if sel == "custom":
-            raw = (scheduler.get("custom_sigmas", "") or "").strip() if isinstance(scheduler, dict) else ""
+        if scheduler == "custom":
+            raw = (custom_sigmas or "").strip()
             if not raw:
                 raise RuntimeError(
                     "调度器选择了 custom（自定义），但「自定义 Sigma」为空——"
@@ -70,15 +73,14 @@ class DeciiaSamplerPreset(io.ComfyNode):
             vals = [float(x) for x in raw.replace("，", ",").split(",") if x.strip()]
             return io.NodeOutput(torch.FloatTensor(vals), sampler)
 
-        steps = int(scheduler.get("steps", 4)) if isinstance(scheduler, dict) else 4
-        denoise = float(scheduler.get("denoise", 1.0)) if isinstance(scheduler, dict) else 1.0
+        steps = int(steps)
         total_steps = steps
         if denoise < 1.0:
             if denoise <= 0.0:
                 return io.NodeOutput(torch.FloatTensor([]), sampler)
             total_steps = int(steps / denoise)
         sigmas = comfy.samplers.calculate_sigmas(
-            model.get_model_object("model_sampling"), sel, total_steps).cpu()
+            model.get_model_object("model_sampling"), scheduler, total_steps).cpu()
         sigmas = sigmas[-(steps + 1):]
         return io.NodeOutput(sigmas, sampler)
 
