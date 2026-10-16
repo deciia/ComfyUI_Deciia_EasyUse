@@ -90,6 +90,7 @@ function _vmlData(node) {
 function _vmlWrite(node, data) {
   const w = _vmlWidget(node, "presets_json");
   if (w) w.value = JSON.stringify(data);
+  if (app.graph) app.graph.setDirtyCanvas(true, true);
 }
 
 function _vmlCombo(node, name) {
@@ -221,6 +222,19 @@ app.registerExtension({
     // 只隐藏 presets_json 数据控件；4 个加载下拉保持原生可见
     const pj = _vmlWidget(node, "presets_json");
     if (pj) { pj.computeSize = () => [0, -4]; pj.hidden = true; }
+
+    // 原生下拉改动 -> 写回当前预设（否则切预设会丢改动）
+    for (const k of ["unet_name", "clip_name", "video_vae_name", "audio_vae_name"]) {
+      const w = _vmlCombo(node, k);
+      if (!w) continue;
+      const orig = w.callback;
+      w.callback = function (v) {
+        const d = _vmlData(node);
+        const p = d && d.presets.find((x) => x.name === d.current);
+        if (p && p[k] !== v) { p[k] = v; _vmlWrite(node, d); }
+        if (orig) return orig.call(this, v);
+      };
+    }
 
     // ⚙ 菜单按钮 + 当前预设名提示
     const bar = document.createElement("div");
