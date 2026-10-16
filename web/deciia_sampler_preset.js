@@ -262,17 +262,20 @@ app.registerExtension({
       }
     } catch (e) {}
 
-    // scheduler=custom 时 steps/denoise 置灰禁用（不参与执行；序列化不受影响）
+    // scheduler=custom 时隐藏 steps/denoise 只显示自定义 Sigma 框；非 custom 反之
+    // （值由预设数据在 onConfigure 回填自愈，隐藏不影响取值）
     function spxSyncCustomVis() {
-      const sch = _spWidget(node, "scheduler");
+      const sch = _spxWidget(node, "scheduler");
       const isCustom = !!sch && sch.value === "custom";
       for (const k of ["steps", "denoise"]) {
-        const w = _spWidget(node, k);
+        const w = _spxWidget(node, k);
         if (!w) continue;
-        w.disabled = isCustom;
+        if (isCustom && !w._spOrigSize) w._spOrigSize = w.computeSize;
+        if (isCustom) { w.computeSize = () => [0, -4]; }
+        else if (w._spOrigSize) { w.computeSize = w._spOrigSize; w._spOrigSize = null; }
       }
-      const cs = _spWidget(node, "custom_sigmas");
-      if (cs) cs.disabled = false;
+      const cs = _spxWidget(node, "custom_sigmas");
+      if (cs) cs.hidden = !isCustom;
       if (app.graph) app.graph.setDirtyCanvas(true, true);
     }
     const schW = _spWidget(node, "scheduler");
@@ -286,6 +289,15 @@ app.registerExtension({
 
     // 工作流数据灌入后刷新按钮
     node.onConfigure = () => {
+      refreshGear(node);
+      spxSyncCustomVis();
+    // 工作流数据灌入后：回填当前预设全部控件值（自愈）+ 刷新按钮与显隐
+    node.onConfigure = () => {
+      const d = _spxData(node);
+      if (d) {
+        const p = d.presets.find((x) => _spxKey(x) === d.current);
+        if (p) _spxApply(node, p);
+      }
       refreshGear(node);
       spxSyncCustomVis();
     };

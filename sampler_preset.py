@@ -37,7 +37,7 @@ class DeciiaSamplerPreset(io.ComfyNode):
                 io.Int.Input("steps", default=4, min=1, max=10000, tooltip="总步数。"),
                 io.Float.Input("denoise", default=1.0, min=0.0, max=1.0, step=0.01,
                                tooltip="去噪强度（<1.0 按内核规则折算步数）。"),
-                io.String.Input("custom_sigmas", default="", multiline=True, advanced=True,
+                io.String.Input("custom_sigmas", default="", advanced=True,
                                 tooltip="自定义 Sigma 阶梯：逗号分隔数值（降序，含末位 0），"
                                         "仅调度器选 custom 时生效。如 14.61,3.2,1.0,0"),
             ],
