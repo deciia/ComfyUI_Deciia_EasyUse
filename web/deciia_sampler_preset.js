@@ -153,9 +153,8 @@ function _spxMenu(node, anchor) {
     (groups[g] ||= []).push(p);
   });
   Object.entries(groups).forEach(([g, ps]) => {
-    addHeader(g);
     ps.forEach((p) => {
-      addItem(p.name, `${p.steps}步·${p.scheduler}`, _spxKey(p) === data.current, () => {
+      addItem(`${g} / ${p.name}`, "", _spxKey(p) === data.current, () => {
         data.current = _spxKey(p);
         _spxWrite(node, data);
         _spxApply(node, p);
