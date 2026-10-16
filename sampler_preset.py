@@ -7,6 +7,8 @@
 Sigmas 计算逐字对齐内核 BasicScheduler；采样器对象逐字对齐 KSamplerSelect。
 """
 
+import json
+
 import comfy.samplers
 import folder_paths
 from comfy_api.latest import io
