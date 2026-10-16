@@ -115,7 +115,7 @@ function _spApply(node, p) {
       if (p.denoise != null) cur.denoise = p.denoise;
     }
     schW.value = cur;
-    if (schW.callback) schW.callback(cur);
+    if (schW.callback) { try { schW.callback(p.scheduler); } catch (e) {} }
   }
   app.graph.setDirtyCanvas(true, true);
 }
