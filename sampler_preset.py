@@ -1,13 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Deiia 采样预设 · 采样器+调度器（v3：用户真实分组版）。
+"""Deiia 采样预设 · 采样器+调度器（终版）。
 
-输入模型，按当前预设输出 Sigmas 与采样器方案。多预设按分组管理
-（分组对齐用户真实场景：H3无损融合单采 / T8双采 / YZ金鱼Selflift双采 / selflift-Avatar）。
-支持每预设自定义 Sigma 阶梯（custom_sigmas，逗号分隔，非空时优先输出）。
-Sigmas 计算逐字对齐内核 BasicScheduler；采样器对象逐字对齐 KSamplerSelect。
+输入模型，按当前预设输出 Sigmas 与采样器方案；支持调度器 custom（自定义 Sigma 阶梯）。
+多预设由前端 ⚙ 菜单管理。Sigmas 计算逐字对齐内核 BasicScheduler；
+采样器对象逐字对齐 KSamplerSelect。
 """
-
-import json
 
 import torch
 import comfy.samplers
@@ -16,24 +13,6 @@ from comfy_api.latest import io
 
 NODE_CLASS_MAPPINGS = {}
 NODE_DISPLAY_NAME_MAPPINGS = {}
-
-_DEFAULT_PRESETS = {
-    "current": "H3无损融合单采/一采采样和调度",
-    "presets": [
-        {"name": "一采采样和调度", "group": "H3无损融合单采",
-         "sampler_name": "euler", "scheduler": "beta", "steps": 6, "denoise": 1.0, "custom_sigmas": ""},
-        {"name": "一采采样和调度", "group": "T8双采",
-         "sampler_name": "euler", "scheduler": "beta", "steps": 4, "denoise": 1.0, "custom_sigmas": ""},
-        {"name": "二采采样和调度", "group": "T8双采",
-         "sampler_name": "euler", "scheduler": "beta", "steps": 4, "denoise": 1.0, "custom_sigmas": ""},
-        {"name": "一采采样和调度", "group": "YZ金鱼Selflift双采",
-         "sampler_name": "euler", "scheduler": "beta", "steps": 6, "denoise": 1.0, "custom_sigmas": ""},
-        {"name": "二采采样和调度", "group": "YZ金鱼Selflift双采",
-         "sampler_name": "euler", "scheduler": "beta", "steps": 4, "denoise": 1.0, "custom_sigmas": ""},
-        {"name": "采样", "group": "selflift-Avatar",
-         "sampler_name": "euler", "scheduler": "beta", "steps": 6, "denoise": 1.0, "custom_sigmas": ""},
-    ],
-}
 
 
 class DeciiaSamplerPreset(io.ComfyNode):
@@ -44,26 +23,23 @@ class DeciiaSamplerPreset(io.ComfyNode):
             display_name="Deiia 采样预设 · 采样器+调度器",
             category="Deciia/local",
             description=(
-                "采样设置预设：按分组管理（H3无损融合单采 / T8双采 / YZ金鱼Selflift双采 / selflift-Avatar…），"
-                "每组内可建多个预设（如 一采采样和调度 / 二采采样和调度）。"
-                "输出 Sigmas 与采样器方案；Sigmas 算法与内核 BasicScheduler 一致，"
-                "预设里填了 custom_sigmas 时优先输出自定义阶梯。"
+                "采样设置预设：输入模型，按当前预设输出 Sigmas 与采样器方案，"
+                "支持多预设切换与调度器 custom（自定义 Sigma 阶梯）。"
+                "Sigmas 算法与内核 BasicScheduler 一致。"
             ),
             inputs=[
                 io.Model.Input("model"),
                 io.Combo.Input("sampler_name", options=comfy.samplers.SAMPLER_NAMES, default="euler",
                                tooltip="采样器方案（预设切换时自动同步）。"),
-                io.Combo.Input("scheduler", options=comfy.samplers.SCHEDULER_NAMES, default="beta",
-                               tooltip="调度器。"),
-                io.Int.Input("steps", default=6, min=1, max=10000, tooltip="总步数。"),
+                io.Combo.Input("scheduler", options=comfy.samplers.SCHEDULER_NAMES + ["custom"],
+                               default="beta",
+                               tooltip="调度器。选 custom 时使用「自定义 Sigma」输入框里的阶梯。"),
+                io.Int.Input("steps", default=4, min=1, max=10000, tooltip="总步数。"),
                 io.Float.Input("denoise", default=1.0, min=0.0, max=1.0, step=0.01,
                                tooltip="去噪强度（<1.0 按内核规则折算步数）。"),
-                io.String.Input("custom_sigmas", default="", advanced=True, multiline=True,
-                                tooltip="自定义 Sigma 阶梯：逗号分隔的数值（降序，含末位 0），"
-                                        "非空时优先于调度器/步数计算。如 '14.61,3.2,1.0,0'。"),
-                io.String.Input("presets_json", default=json.dumps(_DEFAULT_PRESETS, ensure_ascii=False),
-                                multiline=True, advanced=True,
-                                tooltip="预设数据（前端 ⚙ 菜单自动维护，一般不用手改）。"),
+                io.String.Input("custom_sigmas", default="", multiline=True, advanced=True,
+                                tooltip="自定义 Sigma 阶梯：逗号分隔数值（降序，含末位 0），"
+                                        "仅调度器选 custom 时生效。如 14.61,3.2,1.0,0"),
             ],
             outputs=[
                 io.Sigmas.Output(display_name="Sigmas"),
@@ -72,15 +48,17 @@ class DeciiaSamplerPreset(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, model, sampler_name, scheduler, steps, denoise,
-                custom_sigmas="", presets_json="") -> io.NodeOutput:
+    def execute(cls, model, sampler_name, scheduler, steps, denoise, custom_sigmas="") -> io.NodeOutput:
         sampler = comfy.samplers.sampler_object(sampler_name)
 
-        raw = (custom_sigmas or "").strip()
-        if raw:
-            vals = [float(x) for x in raw.replace("，", ",").replace("，", ",").split(",") if x.strip()]
-            if vals:
-                return io.NodeOutput(torch.FloatTensor(vals), sampler)
+        if scheduler == "custom":
+            raw = (custom_sigmas or "").strip()
+            if not raw:
+                raise RuntimeError(
+                    "调度器选择了 custom（自定义），但「自定义 Sigma」为空——"
+                    "请填写逗号分隔的 Sigma 阶梯（如 14.61,3.2,1.0,0），或把调度器改回具体类型")
+            vals = [float(x) for x in raw.replace("，", ",").split(",") if x.strip()]
+            return io.NodeOutput(torch.FloatTensor(vals), sampler)
 
         steps = int(steps)
         total_steps = steps

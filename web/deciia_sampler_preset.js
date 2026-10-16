@@ -1,8 +1,9 @@
-// Deiia 采样预设 · 采样器+调度器 — ⚙ 分组菜单（与加载器同款交互）。
+// Deiia 采样预设 · 采样器+调度器 — ⚙ 菜单管理预设（与加载器同款交互）。
+// 预设数据经 DOM 控件 getValue/setValue 序列化（可靠路径，不依赖隐藏控件）。
 // 弹层使用页面内自定义实现（浏览器 prompt/alert/confirm 会被拦截）。
 import { app } from "../../../scripts/app.js";
 
-function _spxModal(html, onMount) {
+function _spModal(html, onMount) {
   const mask = document.createElement("div");
   mask.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99998;";
   const box = document.createElement("div");
@@ -17,8 +18,8 @@ function _spxModal(html, onMount) {
   onMount(box, close);
 }
 
-function _spxAsk(title, initial, onOk) {
-  _spxModal(`<div style="margin-bottom:8px;">${title}</div>`, (box, close) => {
+function _spAsk(title, initial, onOk) {
+  _spModal(`<div style="margin-bottom:8px;">${title}</div>`, (box, close) => {
     const input = document.createElement("input");
     input.value = initial || "";
     input.style.cssText = "width:100%;box-sizing:border-box;background:#16161c;color:#eee;"
@@ -44,8 +45,8 @@ function _spxAsk(title, initial, onOk) {
   });
 }
 
-function _spxMsg(msg) {
-  _spxModal(`<div style="margin-bottom:10px;">${msg}</div>`, (box, close) => {
+function _spMsg(msg) {
+  _spModal(`<div style="margin-bottom:10px;">${msg}</div>`, (box, close) => {
     const ok = document.createElement("button");
     ok.textContent = "知道了";
     ok.style.cssText = "cursor:pointer;padding:3px 14px;background:#3a3a44;color:#ccc;border:none;border-radius:4px;";
@@ -54,8 +55,8 @@ function _spxMsg(msg) {
   });
 }
 
-function _spxConfirm(msg, onOk) {
-  _spxModal(`<div style="margin-bottom:10px;">${msg}</div>`, (box, close) => {
+function _spConfirm(msg, onOk) {
+  _spModal(`<div style="margin-bottom:10px;">${msg}</div>`, (box, close) => {
     const row = document.createElement("div");
     row.style.cssText = "display:flex;gap:8px;justify-content:flex-end;";
     const ok = document.createElement("button");
@@ -71,36 +72,36 @@ function _spxConfirm(msg, onOk) {
   });
 }
 
-const SPX_KEYS = ["sampler_name", "scheduler", "steps", "denoise", "custom_sigmas"];
+const SP_KEYS = ["sampler_name", "scheduler", "steps", "denoise"];
 
-function _spxKey(p) { return (p.group || "未分组") + "::" + p.name; }
-const SPX_KEYS2 = ["p2_sampler_name", "p2_scheduler", "p2_steps", "p2_denoise"];
-
-function _spxWidget(node, name) {
+function _spWidget(node, name) {
   return node.widgets?.find((w) => w.name === name);
 }
 
-function _spxData(node) {
-  const w = _spxWidget(node, "presets_json");
+// 预设数据存在 node.properties（永远随节点保存/恢复，可靠路径）
+function _spData(node) {
   try {
-    const d = JSON.parse(w.value || "{}");
+    const d = JSON.parse(node.properties?.deiia_sp_data || "{}");
     if (Array.isArray(d.presets) && d.presets.length) {
-      if (!d.current || !d.presets.some((p) => p.name === d.current)) d.current = d.presets[0].name;
+      if (!d.current || !d.presets.some((p) => _spKey(p) === d.current)) {
+        d.current = _spKey(d.presets[0]);
+      }
       return d;
     }
   } catch (e) {}
   return null;
 }
 
-function _spxWrite(node, data) {
-  const w = _spxWidget(node, "presets_json");
-  if (w) w.value = JSON.stringify(data);
+function _spWrite(node, data) {
+  node.properties.deiia_sp_data = JSON.stringify(data);
   if (app.graph) app.graph.setDirtyCanvas(true, true);
 }
 
-function _spxApply(node, p) {
-  for (const k of [...SPX_KEYS, ...SPX_KEYS2]) {
-    const w = _spxWidget(node, k);
+function _spKey(p) { return (p.group || "通用") + "::" + p.name; }
+
+function _spApply(node, p) {
+  for (const k of SP_KEYS) {
+    const w = _spWidget(node, k);
     if (w && p[k] != null) {
       w.value = p[k];
       if (w.callback) w.callback(w.value);
@@ -109,9 +110,8 @@ function _spxApply(node, p) {
   app.graph.setDirtyCanvas(true, true);
 }
 
-// ⚙ 分组菜单：按 group 渲染预设列表 + 新建/改名/删除
-function _spxMenu(node, anchor) {
-  const data = _spxData(node) || { current: "", presets: [] };
+function _spMenu(node, anchor) {
+  const data = _spData(node) || { current: "", presets: [] };
 
   const menu = document.createElement("div");
   menu.style.cssText = "position:fixed;background:#1b1b22;color:#ddd;border:1px solid #4a4a55;"
@@ -119,16 +119,10 @@ function _spxMenu(node, anchor) {
     + "box-shadow:0 6px 24px rgba(0,0,0,.5);font-size:12px;";
   const close = () => menu.remove();
 
-  const addHeader = (text) => {
-    const h = document.createElement("div");
-    h.textContent = "▸ " + text;
-    h.style.cssText = "color:#7fbf7f;font-size:11px;padding:5px 12px 2px;";
-    menu.appendChild(h);
-  };
   const addItem = (label, hint, isCur, fn) => {
     const it = document.createElement("div");
     it.style.cssText = "display:flex;justify-content:space-between;align-items:center;"
-      + "padding:5px 12px 5px 20px;cursor:pointer;border-radius:5px;";
+      + "padding:5px 12px;cursor:pointer;border-radius:5px;";
     it.onmouseenter = () => { it.style.background = "#2f2f3a"; };
     it.onmouseleave = () => { it.style.background = "transparent"; };
     const l = document.createElement("span");
@@ -136,7 +130,7 @@ function _spxMenu(node, anchor) {
     const h = document.createElement("span");
     h.style.cssText = "color:#888;font-size:11px;";
     h.textContent = hint || "";
-    if (isCur) h.textContent = "✓ " + (hint || "");
+    if (isCur) h.textContent = "✓";
     it.append(l, h);
     it.onclick = (e) => { e.stopPropagation(); close(); fn(); };
     menu.appendChild(it);
@@ -149,61 +143,61 @@ function _spxMenu(node, anchor) {
 
   const groups = {};
   data.presets.forEach((p) => {
-    const g = p.group || "未分组";
+    const g = p.group || "通用";
     (groups[g] ||= []).push(p);
   });
   Object.entries(groups).forEach(([g, ps]) => {
     ps.forEach((p) => {
-      addItem(`${g} / ${p.name}`, "", _spxKey(p) === data.current, () => {
-        data.current = _spxKey(p);
-        _spxWrite(node, data);
-        _spxApply(node, p);
+      addItem(`${g} / ${p.name}`, "", _spKey(p) === data.current, () => {
+        data.current = _spKey(p);
+        _spWrite(node, data);
+        _spApply(node, p);
         refreshGear(node);
       });
     });
   });
   addSep();
   addItem("＋ 新预设（复制当前）", "", false, () => {
-    const src = data.presets.find((x) => x.name === data.current);
-    _spxAsk("新预设名（可含分组前缀，如 T8双采/）", (src ? src.name : "预设") + "-copy", (name) => {
-      if (data.presets.some((x) => x.name === name)) {
-        _spxMsg(`预设「${name}」已存在`);
+    const src = data.presets.find((x) => _spKey(x) === data.current);
+    _spAsk("新预设名", (src ? src.name : "预设") + "-copy", (name) => {
+      if (data.presets.some((x) => _spKey(x) === name)) {
+        _spMsg(`预设「${name}」已存在`);
         return;
       }
-      const group = src ? (src.group || "未分组") : "未分组";
-      data.presets.push(JSON.parse(JSON.stringify({ ...(src || {}), name, group })));
-      data.current = group + "::" + name;
-      _spxWrite(node, data);
-      const p = data.presets.find((x) => _spxKey(x) === data.current);
-      if (p) _spxApply(node, p);
+      data.presets.push(JSON.parse(JSON.stringify({ ...(src || {}), name })));
+      data.current = _spKey(data.presets[data.presets.length - 1]);
+      _spWrite(node, data);
+      const p = data.presets.find((x) => _spKey(x) === data.current);
+      if (p) _spApply(node, p);
       refreshGear(node);
     });
   });
   addItem("✎ 改名", "", false, () => {
-    const p = data.presets.find((x) => x.name === data.current);
+    const p = data.presets.find((x) => _spKey(x) === data.current);
     if (!p) return;
-    _spxAsk("重命名预设", data.current, (name) => {
-      if (!name || name === data.current) return;
-      if (data.presets.some((x) => x.name === name)) {
-        _spxMsg(`预设「${name}」已存在`);
+    _spAsk("重命名预设", p.name, (name) => {
+      if (!name || name === p.name) return;
+      if (data.presets.some((x) => x.name === name && x.group === p.group)) {
+        _spMsg(`预设「${name}」已存在`);
         return;
       }
-      p.name = name; data.current = _spxKey(p);
-      _spxWrite(node, data);
+      p.name = name;
+      _spWrite(node, data);
       refreshGear(node);
     });
   });
   addItem("✕ 删除当前预设", "", false, () => {
     if (data.presets.length <= 1) {
-      _spxMsg("至少保留一个预设");
+      _spMsg("至少保留一个预设");
       return;
     }
-    _spxConfirm(`删除预设「${data.current.split("::")[1]}」？（分组：${data.current.split("::")[0]}）`, () => {
-      data.presets = data.presets.filter((x) => _spxKey(x) !== data.current);
-      data.current = _spxKey(data.presets[0]);
-      _spxWrite(node, data);
-      const p = data.presets.find((x) => _spxKey(x) === data.current);
-      if (p) _spxApply(node, p);
+    const cur = data.presets.find((x) => _spKey(x) === data.current);
+    _spConfirm(`删除预设「${cur ? cur.name : data.current}」？`, () => {
+      data.presets = data.presets.filter((x) => _spKey(x) !== data.current);
+      data.current = _spKey(data.presets[0]);
+      _spWrite(node, data);
+      const p = data.presets.find((x) => _spKey(x) === data.current);
+      if (p) _spApply(node, p);
       refreshGear(node);
     });
   });
@@ -223,18 +217,12 @@ function _spxMenu(node, anchor) {
 }
 
 function refreshGear(node) {
-  const btn = node._spxGearBtn;
-  if (btn) {
-    const d = _spDataSafe(node);
-    if (d) {
-      const p = d.presets.find((x) => _spxKey(x) === d.current);
-      btn.textContent = p ? `⚙ ${p.group} / ${p.name}` : "⚙ 预设管理";
-    }
-  }
-}
-
-function _spDataSafe(node) {
-  return _spxData(node);
+  const btn = node._spGearBtn;
+  if (!btn) return;
+  const d = _spData(node);
+  if (!d) { btn.textContent = "⚙ 预设"; return; }
+  const p = d.presets.find((x) => _spKey(x) === d.current);
+  btn.textContent = p ? `⚙ ${p.name}` : "⚙ 预设";
 }
 
 app.registerExtension({
@@ -242,39 +230,28 @@ app.registerExtension({
   nodeCreated(node) {
     if (node.comfyClass !== "DeciiaSamplerPreset") return;
 
-    // presets_json 仅折叠尺寸（不设 hidden——hidden 会被前端跳过序列化）
-    const pj = _spxWidget(node, "presets_json");
-    if (pj) { pj.computeSize = () => [0, -4]; }
-
-    // 原生控件改动 -> 写回当前预设（一采 4 项 + 二采 4 项）
-    for (const k of [...SPX_KEYS, ...SPX_KEYS2]) {
-      const w = _spxWidget(node, k);
-      if (!w) continue;
-      const orig = w.callback;
-      w.callback = function (v) {
-        const d = _spxData(node);
-        const p = d && d.presets.find((x) => _spxKey(x) === d.current);
-        if (p && p[k] !== v) { p[k] = v; _spxWrite(node, d); }
-        if (orig) return orig.call(this, v);
-      };
-    }
+    if (!node._spData) node._spData = { current: "通用", presets: [{
+      name: "通用", group: "通用",
+      sampler_name: "euler", scheduler: "beta", steps: 4, denoise: 1.0,
+    }] };
 
     // ⚙ 菜单按钮（挪到节点最上方）
     const bar = document.createElement("div");
     bar.style.cssText = "display:flex;gap:6px;align-items:center;margin:2px 0;";
     const gear = document.createElement("button");
-    gear.textContent = "⚙ 预设管理";
+    gear.textContent = "⚙ 预设";
     gear.style.cssText = "cursor:pointer;padding:3px 12px;background:#2b2b33;color:#ddd;"
       + "border:1px solid #4a4a55;border-radius:4px;font-size:11px;";
-    node._spxGearBtn = gear;
-    refreshGear(node);
+    node._spGearBtn = gear;
     gear.onclick = (ev) => {
       ev.stopPropagation();
-      _spxMenu(node, gear);
+      _spMenu(node, gear);
     };
     bar.appendChild(gear);
 
-    const domW = node.addDOMWidget("预设管理", "deciia.spx.bar", bar, { getValue: () => "", setValue: () => {} });
+    const domW = node.addDOMWidget("预设管理", "deciia.sp.bar", bar, { getValue: () => "", setValue: () => {} });
+    node._spDomWidget = domW;
+    // 挪到节点最上方（加载下拉之前）
     try {
       const idx = node.widgets.indexOf(domW);
       if (idx > 0) {
@@ -285,13 +262,38 @@ app.registerExtension({
       }
     } catch (e) {}
 
-    // 工作流数据灌入后刷新按钮文字
-    node.onConfigure = () => {
-      const d = _spxData(node);
-      if (d) {
-        if (!d.presets.some((x) => _spxKey(x) === d.current)) d.current = _spxKey(d.presets[0]);
-        refreshGear(node);
+    // scheduler=custom 显隐联动：custom 时隐藏 steps/denoise
+    function spxSyncCustomVis() {
+      const sch = _spWidget(node, "scheduler");
+      const isCustom = !!sch && sch.value === "custom";
+      for (const k of ["steps", "denoise"]) {
+        const w = _spWidget(node, k);
+        if (!w) continue;
+        if (isCustom) { w.computeSize = () => [0, -4]; }
+        else { try { delete w.computeSize; } catch (e) {} }
       }
+      const cs = _spWidget(node, "custom_sigmas");
+      if (cs) {
+        if (isCustom) { try { delete cs.computeSize; } catch (e) {} }
+        else { cs.computeSize = () => [0, -4]; }
+      }
+      if (app.graph) app.graph.setDirtyCanvas(true, true);
+    }
+    const schW = _spWidget(node, "scheduler");
+    if (schW) {
+      const origSch = schW.callback;
+      schW.callback = function (v) {
+        spxSyncCustomVis();
+        if (origSch) return origSch.call(this, v);
+      };
+    }
+
+    // 工作流数据灌入后刷新按钮
+    node.onConfigure = () => {
+      refreshGear(node);
+      spxSyncCustomVis();
     };
+    refreshGear(node);
+    spxSyncCustomVis();
   },
 });
