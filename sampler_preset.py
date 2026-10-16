@@ -31,7 +31,7 @@ class DeciiaSamplerPreset(io.ComfyNode):
                 io.Model.Input("model"),
                 io.Combo.Input("sampler_name", options=comfy.samplers.SAMPLER_NAMES, default="euler",
                                tooltip="采样器方案（预设切换时自动同步）。"),
-                io.Combo.Input("scheduler", options=comfy.samplers.SCHEDULER_NAMES + ["custom"],
+                io.Combo.Input("scheduler", options=["custom"] + comfy.samplers.SCHEDULER_NAMES,
                                default="beta",
                                tooltip="调度器。选 custom 时使用「自定义 Sigma」输入框里的阶梯。"),
                 io.Int.Input("steps", default=4, min=1, max=10000, tooltip="总步数。"),
