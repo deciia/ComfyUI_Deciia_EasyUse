@@ -106,20 +106,13 @@ function _spApply(node, p) {
   }
   const schW = _spWidget(node, "scheduler");
   if (schW && p.scheduler) {
-    const cur = (typeof schW.value === "object" && schW.value) ? { ...schW.value } : {};
-    cur.scheduler = p.scheduler;
-    if (p.scheduler === "custom") {
-      cur.custom_sigmas = p.custom_sigmas || "";
-    } else {
-      if (p.steps != null) cur.steps = p.steps;
-      if (p.denoise != null) cur.denoise = p.denoise;
-    }
-    schW.value = cur;
+    // DynamicCombo 的 widget.value = 选中 key 字符串（dict 由前端提交时组装；塞 dict 会显示 [object Object]）
+    schW.value = p.scheduler;
     if (schW.callback) { try { schW.callback(p.scheduler); } catch (e) {} }
-    // DynamicCombo 切选项会异步重建子控件（steps/denoise），同步赋值会被冲掉——延迟补值两轮
+    // 切选项后前端异步重建子控件——延迟两轮把预设值补进独立子控件
     const reaply = () => {
       const w2 = _spWidget(node, "scheduler");
-      if (!(w2 && typeof w2.value === "object" && w2.value && w2.value.scheduler === p.scheduler)) return;
+      if (!w2 || w2.value !== p.scheduler) return;
       for (const k of ["steps", "denoise"]) {
         if (p[k] == null) continue;
         const cw = _spWidget(node, k);
@@ -264,12 +257,16 @@ function _spCapture(node) {
   const sw = _spWidget(node, "sampler_name");
   if (sw) out.sampler_name = sw.value;
   const schW = _spWidget(node, "scheduler");
-  if (schW && typeof schW.value === "object" && schW.value) {
-    out.scheduler = schW.value.scheduler || "beta";
-    if (out.scheduler === "custom") out.custom_sigmas = schW.value.custom_sigmas || "";
-    else {
-      out.steps = schW.value.steps != null ? schW.value.steps : 4;
-      out.denoise = schW.value.denoise != null ? schW.value.denoise : 1.0;
+  if (schW && typeof schW.value === "string" && schW.value) {
+    out.scheduler = schW.value;
+    if (out.scheduler === "custom") {
+      const cw = _spWidget(node, "custom_sigmas");
+      out.custom_sigmas = cw ? (cw.value || "") : "";
+    } else {
+      const st = _spWidget(node, "steps");
+      const dn = _spWidget(node, "denoise");
+      out.steps = st && st.value != null ? st.value : 8;
+      out.denoise = dn && dn.value != null ? dn.value : 1.0;
     }
   }
   return out;
