@@ -57,8 +57,10 @@ class DeciiaVideoModelLoader(io.ComfyNode):
             ),
             inputs=[
                 io.Combo.Input("unet_name", options=_opts("diffusion_models"),
+                               default="minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors",
                                tooltip="UNet / 扩散模型权重（diffusion_models 目录）。"),
                 io.Combo.Input("clip_name", options=_opts("text_encoders"),
+                               default="qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
                                tooltip="文本编码器权重（text_encoders 目录）。"),
                 io.Combo.Input("video_vae_name", options=_opts("vae"),
                                default="minimax_h3_video_vae_fp16.safetensors",
@@ -98,7 +100,7 @@ class DeciiaVideoModelLoader(io.ComfyNode):
                 clip_type_enum = clip_type  # 交给下游按原样处理
         clip = comfy.sd.load_clip(
             ckpt_paths=[clip_path],
-            embedding_directory=folder_paths.get_full_path("embeddings", None),
+            embedding_directory=folder_paths.get_folder_paths("embeddings"),
             type=clip_type_enum,
         )
         if clip is None:
