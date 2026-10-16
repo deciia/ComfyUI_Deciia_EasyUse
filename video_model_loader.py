@@ -90,18 +90,12 @@ class DeciiaVideoModelLoader(io.ComfyNode):
             raise RuntimeError(f"UNet 加载失败: {unet_name}")
 
         clip_path = folder_paths.get_full_path_or_raise("text_encoders", clip_name)
-        clip_type_enum = clip_type
-        try:
-            clip_type_enum = comfy.sd.CLIPType(clip_type)
-        except Exception:
-            try:
-                clip_type_enum = comfy.sd.CLIPType[clip_type.upper()]
-            except Exception:
-                clip_type_enum = clip_type  # 交给下游按原样处理
+        clip_type_enum = getattr(comfy.sd.CLIPType, clip_type.upper(), comfy.sd.CLIPType.STABLE_DIFFUSION)
         clip = comfy.sd.load_clip(
             ckpt_paths=[clip_path],
             embedding_directory=folder_paths.get_folder_paths("embeddings"),
-            type=clip_type_enum,
+            clip_type=clip_type_enum,
+            model_options={},
         )
         if clip is None:
             raise RuntimeError(f"CLIP 加载失败: {clip_name}")
