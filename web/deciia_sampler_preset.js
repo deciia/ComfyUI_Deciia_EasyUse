@@ -116,6 +116,23 @@ function _spApply(node, p) {
     }
     schW.value = cur;
     if (schW.callback) { try { schW.callback(p.scheduler); } catch (e) {} }
+    // DynamicCombo 切选项会异步重建子控件（steps/denoise），同步赋值会被冲掉——延迟补值两轮
+    const reaply = () => {
+      const w2 = _spWidget(node, "scheduler");
+      if (!(w2 && typeof w2.value === "object" && w2.value && w2.value.scheduler === p.scheduler)) return;
+      for (const k of ["steps", "denoise"]) {
+        if (p[k] == null) continue;
+        const cw = _spWidget(node, k);
+        if (cw && cw.value != p[k]) { cw.value = p[k]; if (cw.callback) { try { cw.callback(p[k]); } catch (e2) {} } }
+      }
+      if (p.scheduler === "custom") {
+        const cw = _spWidget(node, "custom_sigmas");
+        if (cw && p.custom_sigmas != null && cw.value != p.custom_sigmas) cw.value = p.custom_sigmas;
+      }
+      app.graph.setDirtyCanvas(true, true);
+    };
+    setTimeout(reaply, 80);
+    setTimeout(reaply, 300);
   }
   app.graph.setDirtyCanvas(true, true);
 }
