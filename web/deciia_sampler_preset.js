@@ -186,14 +186,18 @@ function _spMenu(node, anchor) {
     });
   });
   addSep();
-  addItem("＋ 新预设（复制当前）", false, () => {
-    const src = data.presets.find((x) => _spKey(x) === data.current);
-    _spAsk("新预设名", (src ? src.name : "预设") + "-copy", (name) => {
-      if (data.presets.some((x) => x.name === name && (x.group || "通用") === (src ? (src.group || "通用") : "通用"))) {
+  addItem("＋ 新预设（默认值）", false, () => {
+    _spAsk("新预设名", `预设${data.presets.length + 1}`, (name) => {
+      if (data.presets.some((x) => x.name === name)) {
         _spMsg(`预设「${name}」已存在`);
         return;
       }
-      data.presets.push(JSON.parse(JSON.stringify({ ...(src || {}), name })));
+      // 固定默认值起点（不复制当前——DynamicCombo 子控件重建会冲掉复制值）
+      data.presets.push({
+        name, group: "通用",
+        sampler_name: "euler", scheduler: "simple",
+        steps: 8, denoise: 1.0, custom_sigmas: "",
+      });
       data.current = _spKey(data.presets[data.presets.length - 1]);
       _spWrite(node, data);
       const p = data.presets.find((x) => _spKey(x) === data.current);
