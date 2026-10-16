@@ -72,7 +72,7 @@ function _spConfirm(msg, onOk) {
   });
 }
 
-const SP_KEYS = ["sampler_name", "scheduler", "steps", "denoise"];
+const SP_KEYS = ["sampler_name"];
 
 function _spWidget(node, name) {
   return node.widgets?.find((w) => w.name === name);
@@ -100,12 +100,23 @@ function _spWrite(node, data) {
 function _spKey(p) { return (p.group || "通用") + "::" + p.name; }
 
 function _spApply(node, p) {
-  for (const k of SP_KEYS) {
-    const w = _spWidget(node, k);
-    if (w && p[k] != null) {
-      w.value = p[k];
-      if (w.callback) w.callback(w.value);
+  const schW = _spWidget(node, "scheduler");
+  if (schW && p.scheduler) {
+    const cur = (typeof schW.value === "object" && schW.value) ? { ...schW.value } : {};
+    cur.scheduler = p.scheduler;
+    if (p.scheduler === "custom") {
+      cur.custom_sigmas = p.custom_sigmas || "";
+    } else {
+      if (p.steps != null) cur.steps = p.steps;
+      if (p.denoise != null) cur.denoise = p.denoise;
     }
+    schW.value = cur;
+    if (schW.callback) schW.callback(cur);
+  }
+  const sw = _spWidget(node, "sampler_name");
+  if (sw && p.sampler_name != null) {
+    sw.value = p.sampler_name;
+    if (sw.callback) sw.callback(sw.value);
   }
   app.graph.setDirtyCanvas(true, true);
 }
@@ -235,6 +246,28 @@ app.registerExtension({
       sampler_name: "euler", scheduler: "beta", steps: 4, denoise: 1.0,
     }] };
 
+    
+    // scheduler（DynamicCombo dict）变化 -> 提取扁平字段写回当前预设
+    const _schW = _spWidget(node, "scheduler");
+    if (_schW) {
+      const _orig = _schW.callback;
+      _schW.callback = function (v) {
+        const d = _spxData(node);
+        const p = d && d.presets.find((x) => _spxKey(x) === d.current);
+        if (p && v && typeof v === "object") {
+          const sel = v.scheduler;
+          if (sel && sel !== p.scheduler) { p.scheduler = sel; }
+          if (sel === "custom") p.custom_sigmas = v.custom_sigmas || "";
+          else {
+            if (v.steps != null) p.steps = v.steps;
+            if (v.denoise != null) p.denoise = v.denoise;
+          }
+          _spxWrite(node, d);
+        }
+        if (_orig) return _orig.call(this, v);
+      };
+    }
+
     // ⚙ 菜单按钮（挪到节点最上方）
     const bar = document.createElement("div");
     bar.style.cssText = "display:flex;gap:6px;align-items:center;margin:2px 0;";
@@ -266,31 +299,9 @@ app.registerExtension({
     // 隐 = computeSize 覆写 [0,-4] + hidden=true；显 = 恢复原 computeSize + hidden=false；
     // 末尾强制尺寸重算。注意：挂载前不能 hidden（行没进过 DOM 就永远无法复显），
     // 所以首次同步必须延迟到挂载后。
-    function spxSyncCustomVis() {
-      const sch = _spxWidget(node, "scheduler");
-      const isCustom = !!sch && sch.value === "custom";
-      const flip = (w, hide) => {
-        if (!w) return;
-        if (hide) {
-          if (w._spOrigCS === undefined) w._spOrigCS = w.computeSize;
-          w.computeSize = function () { return [0, -4]; };
-          w.hidden = true;
-        } else {
-          if (w._spOrigCS !== undefined) w.computeSize = w._spOrigCS;
-          w.hidden = false;
-        }
-      };
-      flip(_spxWidget(node, "steps"), isCustom);
-      flip(_spxWidget(node, "denoise"), isCustom);
-      flip(_spxWidget(node, "custom_sigmas"), !isCustom);
-      try { node.setSize(node.computeSize()); } catch (e) {}
-      if (app.graph) app.graph.setDirtyCanvas(true, true);
-    }
-    const schW = _spWidget(node, "scheduler");
     if (schW) {
       const origSch = schW.callback;
       schW.callback = function (v) {
-        spxSyncCustomVis();
         if (origSch) return origSch.call(this, v);
       };
     }
@@ -298,7 +309,6 @@ app.registerExtension({
     // 工作流数据灌入后刷新按钮
     node.onConfigure = () => {
       refreshGear(node);
-      spxSyncCustomVis();
     // 工作流数据灌入后：回填当前预设全部控件值（自愈）+ 刷新按钮与显隐
     node.onConfigure = () => {
       const d = _spxData(node);
@@ -307,10 +317,8 @@ app.registerExtension({
         if (p) _spxApply(node, p);
       }
       refreshGear(node);
-      spxSyncCustomVis();
     };
     refreshGear(node);
     // 首次同步延迟到挂载后（行先进 DOM，才能被 hidden 移除/复显）
-    setTimeout(() => spxSyncCustomVis(), 50);
   },
 });
