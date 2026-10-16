@@ -76,6 +76,12 @@ function _spWidget(node, name) {
   return node.widgets?.find((w) => w.name === name);
 }
 
+// DynamicCombo 子控件在 widgets 里的名字带父前缀（源码 updateWidgets: `${d.name}.${r}`）
+// 即 "scheduler.steps" 等——兼容裸名查找
+function _spSub(node, leaf) {
+  return node.widgets?.find((w) => w.name === leaf || w.name === "scheduler." + leaf);
+}
+
 function _spKey(p) { return (p.group || "通用") + "::" + p.name; }
 
 // 预设数据存 node.properties（随节点保存/恢复）
@@ -115,11 +121,11 @@ function _spApply(node, p) {
       if (!w2 || w2.value !== p.scheduler) return;
       for (const k of ["steps", "denoise"]) {
         if (p[k] == null) continue;
-        const cw = _spWidget(node, k);
+        const cw = _spSub(node, k);
         if (cw && cw.value != p[k]) { cw.value = p[k]; if (cw.callback) { try { cw.callback(p[k]); } catch (e2) {} } }
       }
       if (p.scheduler === "custom") {
-        const cw = _spWidget(node, "custom_sigmas");
+        const cw = _spSub(node, "custom_sigmas");
         if (cw && p.custom_sigmas != null && cw.value != p.custom_sigmas) cw.value = p.custom_sigmas;
       }
       app.graph.setDirtyCanvas(true, true);
@@ -260,11 +266,11 @@ function _spCapture(node) {
   if (schW && typeof schW.value === "string" && schW.value) {
     out.scheduler = schW.value;
     if (out.scheduler === "custom") {
-      const cw = _spWidget(node, "custom_sigmas");
+      const cw = _spSub(node, "custom_sigmas");
       out.custom_sigmas = cw ? (cw.value || "") : "";
     } else {
-      const st = _spWidget(node, "steps");
-      const dn = _spWidget(node, "denoise");
+      const st = _spSub(node, "steps");
+      const dn = _spSub(node, "denoise");
       out.steps = st && st.value != null ? st.value : 8;
       out.denoise = dn && dn.value != null ? dn.value : 1.0;
     }
