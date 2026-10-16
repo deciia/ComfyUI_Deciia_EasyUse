@@ -160,7 +160,7 @@ function _spMenu(node, anchor) {
   });
   Object.entries(groups).forEach(([g, ps]) => {
     ps.forEach((p) => {
-      addItem(`${g} / ${p.name}`, _spKey(p) === data.current, () => {
+      addItem(p.name, _spKey(p) === data.current, () => {
         data.current = _spKey(p);
         _spWrite(node, data);
         _spApply(node, p);
