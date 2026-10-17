@@ -216,5 +216,35 @@
     "tooltip": "可选的项目循环执行依赖。"
    }
   }
+ },
+ "easy multitrackProject": {
+  "display_name": "多轨项目",
+  "inputs": {
+   "upscaler_unload": {
+    "name": "放大后卸载显存",
+    "tooltip": "举升完成后立即把外部 H3 学习放大器从显存卸载（默认开启，与 YZ金鱼 SelfLift Progressive Sampler 一致），为高清阶段腾显存；关闭则保留供后续复用。仅 selflift 模式生效。"
+   },
+   "lowres_scale": {
+    "name": "低清比例"
+   },
+   "shift_video": {
+    "name": "视频偏移"
+   },
+   "shift_audio": {
+    "name": "音频偏移"
+   },
+   "transition_point": {
+    "name": "过渡点",
+    "tooltip": "过渡点（双语义）：0~1 = 比例（低清阶段占用的 NFE 比例，内部自动换算成步数）；≥1 = 步数（低清评估次数，四舍五入取整，与 selflift-Avatar 的 transition_step 同义）。例：共 7 次评估时 0.71≈5 步；直接填 5 也是 5 步（对齐 MinimaxH3超快数字人）。加减号步进：<1 时 0.05，≥1 时 1。越界会在采样开始时明确报错，不静默夹取。"
+   },
+   "w_min": {
+    "name": "修正强度下限 w_min",
+    "tooltip": "SelfLift 伪影一致性修正的强度下限（默认 0.25 = 原硬编码值）。两组推荐（成对使用）：①温和 0.25 / 0.7（现行默认）；②论文 & YZ金鱼版 0.5 / 1.0（更锐）。约束 0 ≤ w_min ≤ w_max ≤ 1，违反时采样开始会报错。仅当 rho>0 时参与计算。"
+   },
+   "w_max": {
+    "name": "修正强度上限 w_max",
+    "tooltip": "SelfLift 伪影一致性修正的强度上限（默认 0.7 = 原硬编码值）。两组推荐（成对使用）：①温和 0.25 / 0.7（现行默认）；②论文 & YZ金鱼版 0.5 / 1.0（更锐）。约束 0 ≤ w_min ≤ w_max ≤ 1，违反时采样开始会报错。仅当 rho>0 时参与计算。"
+   }
+  }
  }
 }

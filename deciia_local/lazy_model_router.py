@@ -509,6 +509,11 @@ class LazyModelRouter:
         _dbg_pos, _dbg_neg = positive, negative
         positive = _sanitize_conds(positive, "正向条件")
         negative = _sanitize_conds(negative, "负向条件")
+        # 2026-10-17: 负向条件未接线（None）时补空列表——内核 cond_has_hooks 会迭代它，
+        # None 直接 TypeError: 'NoneType' object is not iterable（cfg=1 时空负向无副作用）
+        if negative is None:
+            negative = []
+            log.info("[Lazy模型路由] 负向条件未接线，已按空条件处理")
         if positive is None:
             def _desc(c):
                 if c is None:
