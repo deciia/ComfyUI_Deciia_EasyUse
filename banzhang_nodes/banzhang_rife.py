@@ -1,5 +1,5 @@
-# ---- 班长captain 分享的节点（出自 ComfyUI_Deciia_Banzhang / BanZhang 全家桶）----
-# 由 班长captain（B站昵称）分享并同意收录于此，便于 ComfyUI_Deciia_EasyUse 用户使用。
+# ---- 班长captain 整理分享的节点（出自 ComfyUI_Deciia_Banzhang / BanZhang 全家桶）----
+# 由 班长captain（B站昵称）整理分享并同意收录于此（含其自身的设计与改进），便于 ComfyUI_Deciia_EasyUse 用户使用。
 # 本文件与原插件保持逐字一致（除本注释），同步时以原插件为准。
 # -*- coding: utf-8 -*-
 """ComfyUI 节点：🎞️ 插帧（全显卡通用 · 流式）

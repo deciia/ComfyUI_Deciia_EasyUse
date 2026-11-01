@@ -1,5 +1,5 @@
 # ==============================================================================
-# banzhang_nodes —— 班长captain 分享的节点（经其同意收录）
+# banzhang_nodes —— 班长captain 整理分享的节点（经其同意收录）
 #
 # 原插件 ComfyUI_Deciia_Banzhang（BanZhang 全家桶）未整体开源；这里只收录
 # P3a 参考工作流（example_workflows/P3a-Easy_Project_AllInOnev_beta3）用到的
@@ -11,7 +11,7 @@
 #   🎞️   插帧·RIFE           BanZhang_RIFE_Interpolation
 #   🧹   全能系统净化        BanZhang_VRAM_Cleaner
 #
-# 来源：班长captain（B站昵称）分享。同步以原插件为准。
+# 来源：班长captain（B站昵称）整理分享（含其自身的设计与改进）。同步以原插件为准。
 # 若本机同时安装了原插件，路由（/banzhang/mem_graph 等）以先加载的插件为准，
 # 节点注册以 ComfyUI 加载顺序后者覆盖，两份代码一致、行为相同。
 # ==============================================================================
