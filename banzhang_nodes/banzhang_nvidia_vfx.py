@@ -1,6 +1,5 @@
 # ---- 班长captain 分享的节点（出自 ComfyUI_Deciia_Banzhang / BanZhang 全家桶）----
-# 由 班长captain（B站昵称）分享并同意收录于此，便于 ComfyUI_Deciia_EasyUse 用户使用；
-# 其插件亦集成其他作者的功能，本署名表示分享来源，不代表节点原作者。
+# 由 班长captain（B站昵称）分享并同意收录于此，便于 ComfyUI_Deciia_EasyUse 用户使用。
 # 本文件与原插件保持逐字一致（除本注释），同步时以原插件为准。
 # -*- coding: utf-8 -*-
 """ComfyUI 节点：NVIDIA RTX 视频特效三件套（超分 / 转HDR / 插帧）
