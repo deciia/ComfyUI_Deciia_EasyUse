@@ -119,3 +119,21 @@ try:
 except Exception as _e:
     import logging
     logging.getLogger(__name__).warning("[DeciiaEasyUse] sampler_preset 加载失败: %s", _e)
+
+# --- 班长节点收录（2026-11-01，经班长captain同意）---
+# 只收录 P3a 参考工作流用到的 6 个节点（显存守卫/活动监视器/H3预览覆盖/RTX超分/RIFE插帧/系统净化），
+# 代码与原插件逐字一致；原插件 ComfyUI_Deciia_Banzhang 未整体开源，详见 banzhang_nodes/__init__.py。
+try:
+    from . import banzhang_nodes as _banzhang_nodes
+    _bz_cls = getattr(_banzhang_nodes, "NODE_CLASS_MAPPINGS", {})
+    _bz_disp = getattr(_banzhang_nodes, "NODE_DISPLAY_NAME_MAPPINGS", {})
+    _skip = [k for k in _bz_cls if k in NODE_CLASS_MAPPINGS]
+    if _skip:
+        import logging
+        logging.getLogger(__name__).info(
+            "[DeciiaEasyUse] 班长节点 %s 已由其它包注册，跳过重复注册", _skip)
+    NODE_CLASS_MAPPINGS.update({k: v for k, v in _bz_cls.items() if k not in _skip})
+    NODE_DISPLAY_NAME_MAPPINGS.update({k: _bz_disp.get(k, k) for k in _bz_cls if k not in _skip})
+except Exception as _e:
+    import logging
+    logging.getLogger(__name__).warning("[DeciiaEasyUse] banzhang_nodes 加载失败: %s", _e)
